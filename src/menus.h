@@ -72,6 +72,8 @@ typedef struct MenuItem
     struct MenuItem *prev;	/* prev menu item */
     struct MenuRoot *sub;	/* MenuRoot of a pull right menu */
     struct MenuRoot *root;	/* back pointer to my MenuRoot */
+    Pixmap pixmap_0;		/* rotated string pixel for state == 0 */
+    Pixmap pixmap_1;		/* rotated string pixel for state == 1 */
     const char *item;		/* the character string displayed */
     const char *action;		/* action to be performed */
     Pixel fore;			/* foreground color */

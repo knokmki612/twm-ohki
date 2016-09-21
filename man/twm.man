@@ -551,6 +551,9 @@ This variable specifies a geometry in which the width and height
 give the maximum size for a given window.  This is typically used to
 restrict windows to the size of the screen.  The default width is 32767 -
 screen width.  The default height is 32767 - screen height.
+.IP "\fBMenuAtLeft\fP" 8
+When this variable is set,
+pull-down menus including cascated ones will be placed at the left side.
 .IP "\fBMenuBackground\fP \fIstring\fP" 8
 This variable specifies the background color used for menus,
 and can only be specified inside of a
@@ -562,6 +565,9 @@ inside of a
 .IP "\fBMenuBorderWidth\fP \fIpixels\fP" 8
 This variable specifies the width in pixels of the border surrounding
 menu windows.  The default is 2.
+.IP "\fBMenuBottomUp\fP" 8
+equivalent to set variables both \fBMenuAtLeft\fP and \fBMenuUpward\fP.
+(OBSOLETE!)
 .IP "\fBMenuFont\fP \fIstring\fP" 8
 This variable specifies the font to use when displaying menus.  The default
 is "variable".
@@ -569,6 +575,12 @@ is "variable".
 This variable specifies the foreground color used for menus,
 and can only be specified inside of a
 \fBColor\fP, \fBGrayscale\fP or \fBMonochrome\fP list.  The default is "black".
+.IP "\fBMenuRuns\fP  \fIstring\fP" 8
+This variable specifies the direction of menus displayed,
+"t2b" means top to bottom (downward (default)),
+"b2t" bottom to top (upward),
+"r2l" right to left (leftward),
+"l2r" left to right (rightward), respectively.
 .IP "\fBMenuShadowColor\fP \fIstring\fP" 8
 This variable specifies the color of the shadow behind pull-down menus
 and can only be specified inside of a
@@ -583,6 +595,11 @@ This variable specifies the foreground color for \fBf.title\fP entries in
 menus and
 can only be specified inside of a
 \fBColor\fP or \fBMonochrome\fP list.  The default is "black".
+.IP "\fBMenuUpward\fP" 8
+When this variable is set,
+pull-down menus including cascated ones will be extended upward and
+menu items appear in reverse order.
+(OBSOLETE!)
 .IP "\fBMonochrome\fP { \fIcolors\fP }" 8
 This variable specifies a list of color assignments that should be made if
 the screen has a depth of 1.  See the description of \fBColors\fP.
@@ -756,6 +773,7 @@ for \fBright\fP.  For example:
         "emacs" right           0       0
 }
 .EE
+The window name "*" works as a wildcard.
 The \fBDontSqueezeTitle\fP list can be used to turn off squeezing on
 certain titles.
 .IP "\fBStartIconified\fP [{ \fIwin-list\fP }] " 8
@@ -764,6 +782,15 @@ icons until explicitly deiconified by the user.  If the optional \fIwin-list\fP
 is given, only those windows will be started iconic.  This is useful for
 programs that do not support an \fI-iconic\fP command line option or
 resource.
+.IP "\fBTitleAtBottom\fP [{ \fIwin-list\fP }] " 8
+.IP "\fBTitleAtLeft\fP [{ \fIwin-list\fP }] " 8
+.IP "\fBTitleAtRight\fP [{ \fIwin-list\fP }] " 8
+.IP "\fBTitleAtTop\fP [{ \fIwin-list\fP }] " 8
+These variables indicates the position of the title bar of client windows.
+If the optional \fIwin-list\fP is given, only those windows will
+have the title bar at the specified position.
+You can override the position of the title bar at runtime
+with \fBf.titlepos\fP function.
 .IP "\fBTitleBackground\fP \fIstring\fP [{ \fIwin-list\fP }]" 8
 This variable specifies the background color used in titlebars,
 and may only be specified inside of a
@@ -811,6 +838,14 @@ older toolkits.
 This variable indicates that the pointer should be warped into windows when
 they are deiconified.  If the optional \fIwin-list\fP is given, the pointer
 will only be warped when those windows are deiconified.
+.IP "\fBWarpCursorPos\fP \fInumber\fP or \fIstring\fP" 8
+This variable specifies the position of the pointer when windows are
+deiconified.
+1 (or NW) means upper left (NorthWest), 2 (or W) means middle left (West),
+3 (or SW) means lower left (SouthWest), 4 (or S) means middle bottom (South),
+5 (or SE) means lower right (SouthEast), 6 (or E) means middle right (East),
+7 (or NE) means upper right (NorthEast), 8 (or N) means middle top (North).
+The pointer is located middle of the window by default.
 .IP "\fBWindowRing\fP { \fIwin-list\fP }" 8
 This variable specifies a list of windows along which the \fBf.warpring\fP
 function cycles.
@@ -1134,6 +1169,20 @@ See the variable \fBSortIconManager\fP.
 .IP "\fBf.title\fP" 8
 This function provides a centered, unselectable item in a menu definition.  It
 should not be used in any other context.
+.IP "\fBf.titlepos\fP \fIstring\fP" 8
+This function specifies the position of the title bar of clients windows
+at runtime.
+If \fIstring\fP is "top", "left", "bottom" or "right",
+every clients invoked after this function will have its title bar
+at the specified position regardless of the setting of `.twmrc' .
+If \fIstring\fP is not "top", "left", "bottom" nor "right",
+the setting of `.twmrc' becomes effective again.
+If this function is invoked from title context,
+the titlebar of that window is repositioned.
+.IP "\fBf.titlesqz\fP \fIstring\fP" 8
+When this function is invoked from title context,
+the justification style of squeezed title bar is changed.
+A \fIstring\fP must be one of "left", "center", "right" or "none"
 .IP "\fBf.topzoom\fP" 8
 This variable is similar to the \fBf.bottomzoom\fP function except that
 the selected window is only resized to the top half of the display.

@@ -334,6 +334,9 @@ typedef struct _TwmKeyword {
 #define kw0_NoCaseSensitive		23
 #define kw0_NoRaiseOnWarp		24
 #define kw0_WarpUnmapped		25
+#define kw0_MenuBottomUp		26
+#define kw0_MenuAtLeft			27
+#define kw0_MenuUpward			28
 
 #define kws_UsePPosition		1
 #define kws_IconFont			2
@@ -464,6 +467,8 @@ static TwmKeyword keytable[] = {
     { "f.source",		FSKEYWORD, F_BEEP },  /* XXX - don't work */
     { "f.startwm",		FSKEYWORD, F_STARTWM },
     { "f.title",		FKEYWORD, F_TITLE },
+    { "f.titlepos",		FSKEYWORD, F_TITLEPOS },
+    { "f.titlesqz",		FSKEYWORD, F_TITLESQZ },
     { "f.topzoom",		FKEYWORD, F_TOPZOOM },
     { "f.twmrc",		FKEYWORD, F_RESTART },
     { "f.unfocus",		FKEYWORD, F_UNFOCUS },
@@ -514,14 +519,18 @@ static TwmKeyword keytable[] = {
     { "maketitle",		MAKE_TITLE, 0 },
     { "maxwindowsize",		SKEYWORD, kws_MaxWindowSize },
     { "menu",			MENU, 0 },
+    { "menuatleft",		KEYWORD, kw0_MenuAtLeft },
     { "menubackground",		CKEYWORD, kwc_MenuBackground },
     { "menubordercolor",	CKEYWORD, kwc_MenuBorderColor },
     { "menuborderwidth",	NKEYWORD, kwn_MenuBorderWidth },
+    { "menubottomup",		KEYWORD, kw0_MenuBottomUp },
     { "menufont",		SKEYWORD, kws_MenuFont },
     { "menuforeground",		CKEYWORD, kwc_MenuForeground },
+    { "menuruns",		MENU_RUNS, 0},
     { "menushadowcolor",	CKEYWORD, kwc_MenuShadowColor },
     { "menutitlebackground",	CKEYWORD, kwc_MenuTitleBackground },
     { "menutitleforeground",	CKEYWORD, kwc_MenuTitleForeground },
+    { "menuupward",		KEYWORD, kw0_MenuUpward },
     { "meta",			META, 0 },
     { "mod",			META, 0 },  /* fake it */
     { "monochrome",		MONOCHROME, 0 },
@@ -569,6 +578,10 @@ static TwmKeyword keytable[] = {
     { "starticonified",		START_ICONIFIED, 0 },
     { "t",			TITLE, 0 },
     { "title",			TITLE, 0 },
+    { "titleatbottom",		TITLE_AT_BOTTOM, 0},
+    { "titleatleft",		TITLE_AT_LEFT, 0},
+    { "titleatright",		TITLE_AT_RIGHT, 0},
+    { "titleattop",		TITLE_AT_TOP, 0},
     { "titlebackground",	CLKEYWORD, kwcl_TitleBackground },
     { "titlebuttonborderwidth",	NKEYWORD, kwn_TitleButtonBorderWidth },
     { "titlefont",		SKEYWORD, kws_TitleFont },
@@ -580,6 +593,7 @@ static TwmKeyword keytable[] = {
     { "w",			WINDOW, 0 },
     { "wait",			WAIT, 0 },
     { "warpcursor",		WARP_CURSOR, 0 },
+    { "warpcursorpos",		WARP_CURSOR_POS, 0 },
     { "warpunmapped",		KEYWORD, kw0_WarpUnmapped },
     { "west",			DKEYWORD, D_WEST },
     { "window",			WINDOW, 0 },
@@ -720,6 +734,19 @@ int do_single_keyword (int keyword)
 
       case kw0_WarpUnmapped:
 	Scr->WarpUnmapped = TRUE;
+	return 1;
+
+      case kw0_MenuBottomUp:
+	Scr->MenuAtLeft = TRUE;
+	Scr->MenuRuns = MenuRuns_B2T;
+	return 1;
+
+      case kw0_MenuAtLeft:
+	Scr->MenuAtLeft = TRUE;
+	return 1;
+
+      case kw0_MenuUpward:
+	Scr->MenuRuns = MenuRuns_B2T;
 	return 1;
     }
 

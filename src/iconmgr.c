@@ -175,7 +175,7 @@ void MoveIconManager(int dir)
     int row_inc, col_inc;
     int got_it;
 
-    if (!Active) return;
+    if (!Active || !Active->iconmgr) return; /* XXX */
 
     cur_row = Active->row;
     cur_col = Active->col;
@@ -227,14 +227,26 @@ void MoveIconManager(int dir)
     {
 	new_row += row_inc;
 	new_col += col_inc;
-	if (new_row < 0)
+	if (new_row < 0) {
 	    new_row = ip->cur_rows - 1;
-	if (new_col < 0)
+	    if (--new_col < 0)
+		new_col = ip->cur_columns -1;
+	}
+	if (new_col < 0) {
 	    new_col = ip->cur_columns - 1;
-	if (new_row >= ip->cur_rows)
+	    if (--new_row < 0)
+		new_row = ip->cur_rows - 1;
+	}
+	if (new_row >= ip->cur_rows) {
 	    new_row = 0;
-	if (new_col >= ip->cur_columns)
+	    if (++new_col >= ip->cur_columns)
+		new_col = 0;
+	}
+	if (new_col >= ip->cur_columns) {
 	    new_col = 0;
+	    if (++new_row >= ip->cur_rows)
+		new_row = 0;
+	}
 
 	/* Now let's go through the list to see if there is an entry with this
 	 * new position
@@ -291,7 +303,7 @@ void JumpIconManager(int dir)
     ScreenInfo *sp;
     int screen;
 
-    if (!Active) return;
+    if (!Active || !Active->iconmgr) return; /* XXX */
 
 
 #define ITER(i) (dir == F_NEXTICONMGR ? (i)->next : (i)->prev)
@@ -683,9 +695,16 @@ void PackIconManager(IconMgr *ip)
     XResizeWindow(dpy, ip->w, newwidth, ip->height);
 
     savewidth = ip->width;
-    if (ip->twm_win)
+    if (ip->twm_win) {
+     if (ip->twm_win->title_pos == TP_TOP ||
+	 ip->twm_win->title_pos == TP_BOTTOM)
       SetupWindow (ip->twm_win,
 		   ip->twm_win->frame_x, ip->twm_win->frame_y,
 		   newwidth, ip->height + ip->twm_win->title_height, -1);
+     else
+      SetupWindow (ip->twm_win,
+		   ip->twm_win->frame_x, ip->twm_win->frame_y,
+		   newwidth + ip->twm_win->title_height, ip->height, -1);
+    }
     ip->width = savewidth;
 }

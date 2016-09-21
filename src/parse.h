@@ -146,6 +146,8 @@ extern int mods;
 #define F_COLORMAP		110	/* string */
 #define F_PRIORITY		111	/* string */
 #define F_STARTWM		114	/* string */
+#define F_TITLEPOS		115	/* string */
+#define F_TITLESQZ		116	/* string */
 
 #define D_NORTH			1
 #define D_SOUTH			2

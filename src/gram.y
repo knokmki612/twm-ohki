@@ -91,6 +91,8 @@ static Bool CheckWarpRingArg ( char *s );
 static Bool CheckColormapArg ( char *s );
 static void RemoveDQuote ( char *str );
 
+static int nsew ( char *s);
+
 static char *ptr;
 static name_list **list;
 static int cont = 0;
@@ -122,13 +124,17 @@ static void yyerror ( const char *s );
 %token <num> NUMBER KEYWORD NKEYWORD CKEYWORD CLKEYWORD FKEYWORD FSKEYWORD
 %token <num> SKEYWORD DKEYWORD JKEYWORD WINDOW_RING WARP_CURSOR ERRORTOKEN
 %token <num> NO_STACKMODE
+%token <num> WARP_CURSOR_POS
 %token <ptr> STRING
+%token <num> TITLE_AT_TOP TITLE_AT_BOTTOM TITLE_AT_LEFT TITLE_AT_RIGHT
+%token <num> MENU_RUNS
 
 %type <ptr> string
 %type <num> pixmap_list cursor_list color_list save_color_list stmt
 %type <num> win_color_list iconm_list win_list icon_list function menu
 %type <num> noarg sarg error narg squeeze color_entry
 %type <num> action button number signed_number full fullkey
+%type <num> titlepos
 
 %start twmrc
 
@@ -145,6 +151,18 @@ stmt		: error
 		| sarg
 		| narg
 		| squeeze
+		| titlepos
+		| MENU_RUNS string	{ if (strcmp($2, "t2b")== 0)
+					    Scr->MenuRuns = MenuRuns_T2B;
+					  else if (strcmp($2, "b2t")== 0)
+					    Scr->MenuRuns = MenuRuns_B2T;
+					  else if (strcmp($2, "r2l")== 0)
+					    Scr->MenuRuns = MenuRuns_R2L;
+					  else if (strcmp($2, "l2r")== 0)
+					    Scr->MenuRuns = MenuRuns_L2R;
+					  else fprintf(stderr,
+					    "MenuRuns \"{t2b|b2t|r2l|l2r}\"\n");
+					}
 		| ICON_REGION string DKEYWORD DKEYWORD number number
 					{ AddIconRegion($2, $3, $4, $5, $6); }
 		| ICONMGR_GEOMETRY string number	{ if (Scr->FirstTime)
@@ -274,6 +292,12 @@ stmt		: error
 		  win_list
 		| WARP_CURSOR		{ if (Scr->FirstTime)
 					    Scr->WarpCursor = TRUE; }
+		| WARP_CURSOR_POS number
+					{ if (Scr->FirstTime)
+					    Scr->WarpCursorPos = $2; }
+		| WARP_CURSOR_POS string
+					{ if (Scr->FirstTime)
+					    Scr->WarpCursorPos = nsew($2); }
 		| WINDOW_RING		{ list = &Scr->WindowRingL; }
 		  win_list
 		;
@@ -506,6 +530,40 @@ squeeze		: SQUEEZE_TITLE {
 		  LB win_sqz_entries RB
 		| DONT_SQUEEZE_TITLE { Scr->SqueezeTitle = FALSE; }
 		| DONT_SQUEEZE_TITLE { list = &Scr->DontSqueezeTitleL; }
+		  win_list
+		;
+
+titlepos	: TITLE_AT_TOP {
+				     Scr->TitlePos = TP_TOP;
+				}
+		| TITLE_AT_TOP { list = &Scr->TitlePosTopL;
+				 if (Scr->TitlePos == -1)
+				   Scr->TitlePos = TP_TOP;
+				}
+		  win_list
+		| TITLE_AT_LEFT {
+				     Scr->TitlePos = TP_LEFT;
+				}
+		| TITLE_AT_LEFT { list = &Scr->TitlePosLeftL;
+				  if (Scr->TitlePos == -1)
+				    Scr->TitlePos = TP_LEFT;
+				}
+		  win_list
+		| TITLE_AT_BOTTOM {
+				     Scr->TitlePos = TP_BOTTOM;
+				}
+		| TITLE_AT_BOTTOM { list = &Scr->TitlePosBottomL;
+				    if (Scr->TitlePos == -1)
+				      Scr->TitlePos = TP_BOTTOM;
+				}
+		  win_list
+		| TITLE_AT_RIGHT {
+				     Scr->TitlePos = TP_RIGHT;
+				}
+		| TITLE_AT_RIGHT { list = &Scr->TitlePosRightL;
+				   if (Scr->TitlePos == -1)
+				     Scr->TitlePos = TP_RIGHT;
+				}
 		  win_list
 		;
 
@@ -874,6 +932,19 @@ static Bool CheckColormapArg (char *s)
     return False;
 }
 
+static int nsew(s)
+    register char *s;
+{
+    if (strcasecmp(s, "nw") == 0) return 1;
+    if (strcasecmp(s, "w" ) == 0) return 2;
+    if (strcasecmp(s, "sw") == 0) return 3;
+    if (strcasecmp(s, "s" ) == 0) return 4;
+    if (strcasecmp(s, "se") == 0) return 5;
+    if (strcasecmp(s, "e" ) == 0) return 6;
+    if (strcasecmp(s, "ne") == 0) return 7;
+    if (strcasecmp(s, "n" ) == 0) return 8;
+    return 0;
+}
 
 void
 twmrc_error_prefix (void)

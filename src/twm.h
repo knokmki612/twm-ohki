@@ -70,6 +70,7 @@ from The Open Group.
 #include <X11/Xutil.h>
 #include <X11/cursorfont.h>
 #include <X11/extensions/shape.h>
+#include <X11/extensions/Xrandr.h>
 #include <X11/Xfuncs.h>
 #include <X11/StringDefs.h>
 #include <X11/Intrinsic.h>
@@ -226,6 +227,7 @@ typedef struct TwmWindow
     int old_bw;			/* border width before reparenting */
     Window frame;		/* the frame window */
     Window title_w;		/* the title bar window */
+    Pixmap title_pixmap;	/* the title string rotated CW */
     Window hilite_w;		/* the hilite window */
     Pixmap gray;
     Window icon_w;		/* the icon window */
@@ -245,6 +247,15 @@ typedef struct TwmWindow
     int icon_height;		/* height of the icon bitmap */
     int title_height;		/* height of the title bar */
     int title_width;		/* width of the title bar */
+	/*
+	 * title_height & title_width are size of title bar in
+	 * horizontale layout even if title_pos is TP_LEFT or TP_RIGHT
+	 */
+    int title_pos;		/* position of title bar */
+#define TP_TOP          0
+#define TP_LEFT         1
+#define TP_BOTTOM       2
+#define TP_RIGHT        3
     char *full_name;		/* full name of the window */
     char *name;			/* name of the window */
     char *icon_name;		/* name of the icon */
@@ -354,6 +365,7 @@ extern XtAppContext appContext;
 extern Window ResizeWindow;	/* the window we are resizing */
 extern int HasShape;		/* this server supports Shape extension */
 extern int HasSync;		/* this server supports SYNC extension */
+extern int HasRandr;		/* this server supports Randr extension */
 
 extern int PreviousScreen;
 
@@ -409,6 +421,9 @@ extern Bool use_fontset;
 
 extern int ShapeEventBase;
 extern int ShapeErrorBase;
+
+extern int RandrEventBase;
+extern int RandrErrorBase;
 
 #define _XA_MIT_PRIORITY_COLORS		TwmAtoms[0]
 #define _XA_WM_CHANGE_STATE		TwmAtoms[1]

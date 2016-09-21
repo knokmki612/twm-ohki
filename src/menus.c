@@ -127,6 +127,38 @@ static void WarpToWindow ( TwmWindow *t );
 
 #define SHADOWWIDTH 5			/* in pixels */
 
+static void
+set_pos(int *x, int *y, TwmWindow *p, int how)
+{
+   int height = p->attr.height;
+   int width = p->attr.width;
+   switch (how) {
+   case 1: /* upper left */
+     *x = 2; *y = 5; break;
+   case 2: /* middle left */
+     *x = 2; *y = height / 2; break;
+   case 3: /* lower left */
+     *x = 2; *y = height - 5; break;
+   case 4: /* middle bottom */
+     *x = width / 2 ; *y = height - 5; break;
+   case 5: /* lower right */
+     *x = width - 2 ; *y = height - 5; break;
+   case 6: /* middle right */
+     *x = width - 2 ; *y = height / 2; break;
+   case 7: /* upper right */
+     *x = width - 2 ; *y = 5; break;
+   case 8: /* middle top */
+     *x = width / 2 ; *y = 5; break;
+   default: /* middle */
+     *x = width / 2 ; *y = height / 2; break;
+   }
+   if (p->title_height > 0) {
+     if (p->title_pos == TP_TOP)
+       *y += Scr->TitleHeight;
+     if (p->title_pos == TP_LEFT)
+       *x += Scr->TitleHeight;
+   }
+}
 
 
 
@@ -367,6 +399,7 @@ void
 PaintEntry(MenuRoot *mr, MenuItem *mi, int exposure)
 {
     int y_offset;
+    int y_offset_x;
     int text_y;
     GC gc;
 
@@ -375,6 +408,7 @@ PaintEntry(MenuRoot *mr, MenuItem *mi, int exposure)
 #endif
     y_offset = mi->item_num * Scr->EntryHeight;
     text_y = y_offset + Scr->MenuFont.y;
+    y_offset_x = y_offset + (Scr->EntryHeight - Scr->MenuFont.height);
 
     if (mi->func != F_TITLE)
     {
@@ -384,13 +418,24 @@ PaintEntry(MenuRoot *mr, MenuItem *mi, int exposure)
 	{
 	    XSetForeground(dpy, Scr->NormalGC, mi->hi_back);
 
-	    XFillRectangle(dpy, mr->w, Scr->NormalGC, 0, y_offset,
-		mr->width, Scr->EntryHeight);
+	    if (VMenu(Scr))
+	      XFillRectangle(dpy, mr->w, Scr->NormalGC, 0, y_offset,
+			     mr->width, Scr->EntryHeight);
+	    else
+	      XFillRectangle(dpy, mr->w, Scr->NormalGC, y_offset, 0,
+			     Scr->EntryHeight, mr->width);
 
 	    MyFont_ChangeGC(mi->hi_fore, mi->hi_back, &Scr->MenuFont);
 
-	    MyFont_DrawString(dpy, mr->w, &Scr->MenuFont, Scr->NormalGC, mi->x,
-		text_y, mi->item, mi->strlen);
+	    if (VMenu(Scr))
+	      MyFont_DrawString(dpy, mr->w, &Scr->MenuFont, Scr->NormalGC,
+				mi->x, text_y,
+				mi->item, mi->strlen);
+	    else
+	      MyFont_DrawString_Rotated(dpy, mr->w, &Scr->MenuFont,
+					Scr->NormalGC,
+					mi->x, y_offset_x,
+					mi->item, mi->strlen, &mi->pixmap_1);
 
 	    gc = Scr->NormalGC;
 	}
@@ -400,8 +445,12 @@ PaintEntry(MenuRoot *mr, MenuItem *mi, int exposure)
 	    {
 		XSetForeground(dpy, Scr->NormalGC, mi->back);
 
-		XFillRectangle(dpy, mr->w, Scr->NormalGC, 0, y_offset,
-		    mr->width, Scr->EntryHeight);
+		if (VMenu(Scr))
+		  XFillRectangle(dpy, mr->w, Scr->NormalGC, 0, y_offset,
+				 mr->width, Scr->EntryHeight);
+		else
+		  XFillRectangle(dpy, mr->w, Scr->NormalGC, y_offset, 0,
+				 Scr->EntryHeight, mr->width);
 
 		MyFont_ChangeGC(mi->fore, mi->back, &Scr->MenuFont);
 		gc = Scr->NormalGC;
@@ -409,8 +458,13 @@ PaintEntry(MenuRoot *mr, MenuItem *mi, int exposure)
 	    else
 		gc = Scr->MenuGC;
 
-	    MyFont_DrawString(dpy, mr->w, &Scr->MenuFont, gc,
-		    mi->x, text_y, mi->item, mi->strlen);
+	    if (VMenu(Scr))
+	      MyFont_DrawString(dpy, mr->w, &Scr->MenuFont, gc,
+				mi->x, text_y, mi->item, mi->strlen);
+	    else
+	      MyFont_DrawString_Rotated(dpy, mr->w, &Scr->MenuFont, gc,
+					mi->x, y_offset_x,
+					mi->item, mi->strlen, &mi->pixmap_0);
 
 	}
 
@@ -424,8 +478,21 @@ PaintEntry(MenuRoot *mr, MenuItem *mi, int exposure)
 	    }
 	    x = mr->width - Scr->pullW - 5;
 	    y = y_offset + ((Scr->MenuFont.height - Scr->pullH) / 2);
-	    XCopyPlane(dpy, Scr->pullPm, mr->w, gc, 0, 0,
-		Scr->pullW, Scr->pullH, x, y, 1);
+	    if (VMenu(Scr)) {
+	      if (Scr->MenuAtLeft == TRUE)
+		XCopyPlane(dpy, Scr->pullPm, mr->w, gc, 0, 0,
+			   Scr->pullW, Scr->pullH, 5, y, 1);
+	      else
+		XCopyPlane(dpy, Scr->pullPm, mr->w, gc, 0, 0,
+			   Scr->pullW, Scr->pullH, x, y, 1);
+	    } else {
+	      if (Scr->MenuAtLeft == TRUE)
+		XCopyPlane(dpy, Scr->pullPm, mr->w, gc, 0, 0,
+			   Scr->pullW, Scr->pullH, y+4, 5, 1);
+	      else
+		XCopyPlane(dpy, Scr->pullPm, mr->w, gc, 0, 0,
+			   Scr->pullW, Scr->pullH, y+4, x, 1);
+	    }
 	}
     }
     else
@@ -435,23 +502,40 @@ PaintEntry(MenuRoot *mr, MenuItem *mi, int exposure)
 	XSetForeground(dpy, Scr->NormalGC, mi->back);
 
 	/* fill the rectangle with the title background color */
-	XFillRectangle(dpy, mr->w, Scr->NormalGC, 0, y_offset,
-	    mr->width, Scr->EntryHeight);
+	if (VMenu(Scr))
+	  XFillRectangle(dpy, mr->w, Scr->NormalGC, 0, y_offset,
+			 mr->width, Scr->EntryHeight);
+	else
+	  XFillRectangle(dpy, mr->w, Scr->NormalGC, y_offset, 0,
+			 Scr->EntryHeight, mr->width);
 
 	{
 	    XSetForeground(dpy, Scr->NormalGC, mi->fore);
 	    /* now draw the dividing lines */
-	    if (y_offset)
-	      XDrawLine (dpy, mr->w, Scr->NormalGC, 0, y_offset,
-			 mr->width, y_offset);
-	    y = ((mi->item_num+1) * Scr->EntryHeight)-1;
-	    XDrawLine(dpy, mr->w, Scr->NormalGC, 0, y, mr->width, y);
+	    if (VMenu(Scr)) {
+	      if (y_offset)
+		XDrawLine (dpy, mr->w, Scr->NormalGC, 0, y_offset,
+			   mr->width, y_offset);
+	      y = ((mi->item_num+1) * Scr->EntryHeight)-1;
+	      XDrawLine(dpy, mr->w, Scr->NormalGC, 0, y, mr->width, y);
+	    }
 	}
 
 	MyFont_ChangeGC(mi->fore, mi->back, &Scr->MenuFont);
 	/* finally render the title */
-	MyFont_DrawString(dpy, mr->w, &Scr->MenuFont, Scr->NormalGC, mi->x,
-	    text_y, mi->item, mi->strlen);
+	if (VMenu(Scr))
+	  MyFont_DrawString(dpy, mr->w, &Scr->MenuFont, Scr->NormalGC, mi->x,
+			    text_y, mi->item, mi->strlen);
+	else {
+	  MyFont_DrawString_Rotated(dpy, mr->w, &Scr->MenuFont, Scr->NormalGC,
+				    mi->x, y_offset_x,
+				    mi->item, mi->strlen, &mi->pixmap_0);
+	  if (y_offset)
+	    XDrawLine (dpy, mr->w, Scr->NormalGC, y_offset, 0,
+		       y_offset, mr->width);
+	  y = ((mi->item_num+1) * Scr->EntryHeight)-1;
+	  XDrawLine(dpy, mr->w, Scr->NormalGC, y, 0, y, mr->width);
+	}
     }
 }
 
@@ -468,8 +552,10 @@ PaintMenu(MenuRoot *mr, XEvent *e)
 	/* be smart about handling the expose, redraw only the entries
 	 * that we need to
 	 */
-	if (e->xexpose.y < (y_offset + Scr->EntryHeight) &&
-	    (e->xexpose.y + e->xexpose.height) > y_offset)
+	if (VMenu(Scr) && e->xexpose.y < (y_offset + Scr->EntryHeight) &&
+	    (e->xexpose.y + e->xexpose.height) > y_offset ||
+	    HMenu(Scr) && e->xexpose.x < (y_offset + Scr->EntryHeight) &&
+	    (e->xexpose.x + e->xexpose.width) > y_offset)
 	{
 	    PaintEntry(mr, mi, True);
 	}
@@ -537,7 +623,8 @@ UpdateMenu(void)
 	    Scr = (struct ScreenInfo *) context_data;
 
 	if (x < 0 || y < 0 ||
-	    x >= ActiveMenu->width || y >= ActiveMenu->height)
+	    (VMenu(Scr) && (x >= ActiveMenu->width || y >= ActiveMenu->height)) ||
+	    (HMenu(Scr) && (x >= ActiveMenu->height || y >= ActiveMenu->width)))
 	{
 	    if (ActiveItem && ActiveItem->func != F_TITLE)
 	    {
@@ -549,7 +636,10 @@ UpdateMenu(void)
 	}
 
 	/* look for the entry that the mouse is in */
-	entry = y / Scr->EntryHeight;
+	if (VMenu(Scr))
+	  entry = y / Scr->EntryHeight;
+	else
+	  entry = x / Scr->EntryHeight;
 	for (i = 0, mi = ActiveMenu->first; mi != NULL; i++, mi=mi->next)
 	{
 	    if (i == entry)
@@ -588,18 +678,28 @@ UpdateMenu(void)
 
 	/* now check to see if we were over the arrow of a pull right entry */
 	if (ActiveItem && ActiveItem->func == F_MENU &&
-	    ((ActiveMenu->width - x) < (ActiveMenu->width >> 1)))
+	    ( VMenu(Scr) &&
+	      ( (((Scr->MenuAtLeft == FALSE)?(ActiveMenu->width - x):(x)))
+		< (ActiveMenu->width * 2 / 5)) ||
+	      HMenu(Scr) &&
+	      ( (((Scr->MenuAtLeft == FALSE)?(ActiveMenu->width - y):(y)))
+		< (ActiveMenu->width * 2 / 5))))
 	{
 	    MenuRoot *save = ActiveMenu;
 	    int savex = MenuOrigins[MenuDepth - 1].x;
 	    int savey = MenuOrigins[MenuDepth - 1].y;
 
 	    if (MenuDepth < MAXMENUDEPTH) {
+	      if (VMenu(Scr))
 		PopUpMenu (ActiveItem->sub,
 			   (savex + (ActiveMenu->width >> 1)),
-			   (savey + ActiveItem->item_num * Scr->EntryHeight)
-			   /*(savey + ActiveItem->item_num * Scr->EntryHeight +
-			    (Scr->EntryHeight >> 1))*/, False);
+			   (savey + ActiveItem->item_num * Scr->EntryHeight),
+			   False);
+	      else
+		PopUpMenu (ActiveItem->sub,
+			   (savex + ActiveItem->item_num * Scr->EntryHeight),
+			   (savey + (ActiveMenu->width >> 1)),
+			   False);
 	    } else if (!badItem) {
 		Bell(XkbBI_MinorError,0,None);
 		badItem = ActiveItem;
@@ -699,6 +799,7 @@ AddToMenu(MenuRoot *menu, const char *item, const char *action,
 
     tmp = malloc(sizeof(MenuItem));
     tmp->root = menu;
+    tmp->pixmap_0 = tmp->pixmap_1 = None;
 
     if (menu->first == NULL)
     {
@@ -745,7 +846,27 @@ AddToMenu(MenuRoot *menu, const char *item, const char *action,
 	menu->pull = TRUE;
     }
     tmp->item_num = menu->items++;
+    /* move last entry (i.e. tmp) to head */
+    if ((Scr->MenuRuns == MenuRuns_B2T || Scr->MenuRuns == MenuRuns_R2L)
+	&& menu->first != menu->last) {
+	int i;
+	MenuItem *mi;
 
+	/* remove last entry (i.e. tmp) */
+	menu->last = tmp->prev;
+	menu->last->next = NULL;
+	/* put tmp at head */
+	menu->first->prev = tmp;
+	tmp->next = menu->first;
+	tmp->prev = NULL;
+	menu->first = tmp;
+	tmp->prev = NULL;
+	/* set sequence number */
+	for (i = 0, mi = menu->first; mi; mi = mi->next)
+	    mi->item_num = i++;
+	if (i != menu->items)
+	   fprintf(stderr, "AddToMenu(): items count mismatch!\n");
+    }
     return (tmp);
 }
 
@@ -795,7 +916,12 @@ MakeMenu(MenuRoot *mr)
 	for (cur = mr->first; cur != NULL; cur = cur->next)
 	{
 	    if (cur->func != F_TITLE)
-		cur->x = 5;
+		{
+		    if (Scr->MenuAtLeft == TRUE && mr->pull == TRUE)
+			cur->x = 5 + 16;
+		    else
+			cur->x = 5;
+		}
 	    else
 	    {
 		cur->x = width - MyFont_TextWidth(&Scr->MenuFont, cur->item,
@@ -820,8 +946,8 @@ MakeMenu(MenuRoot *mr)
 		attributes.save_under = True;
 	    }
 	    mr->shadow = XCreateWindow (dpy, Scr->Root, 0, 0,
-					(unsigned int) mr->width,
-					(unsigned int) mr->height,
+		VMenu(Scr) ? (unsigned int) mr->width : (unsigned int) mr->height,
+		VMenu(Scr) ? (unsigned int) mr->height : (unsigned int) mr->width,
 					(unsigned int)0,
 					CopyFromParent,
 					(unsigned int) CopyFromParent,
@@ -841,13 +967,13 @@ MakeMenu(MenuRoot *mr)
 	    valuemask |= CWBackingStore;
 	    attributes.backing_store = Always;
 	}
-	mr->w = XCreateWindow (dpy, Scr->Root, 0, 0, (unsigned int) mr->width,
-			       (unsigned int) mr->height,
+	mr->w = XCreateWindow (dpy, Scr->Root, 0, 0,
+		VMenu(Scr) ? (unsigned int) mr->width : (unsigned int) mr->height,
+		VMenu(Scr) ? (unsigned int) mr->height : (unsigned int) mr->width,
 			       (unsigned int) Scr->MenuBorderWidth,
 			       CopyFromParent, (unsigned int) CopyFromParent,
 			       (Visual *) CopyFromParent,
 			       valuemask, &attributes);
-
 
 	XSaveContext(dpy, mr->w, MenuContext, (caddr_t)mr);
 	XSaveContext(dpy, mr->w, ScreenContext, (caddr_t)Scr);
@@ -1050,19 +1176,53 @@ PopUpMenu (MenuRoot *menu, int x, int y, Bool center)
     menu->entered = FALSE;
 
     if (center) {
+      if (VMenu(Scr)) {
 	x -= (menu->width / 2);
 	y -= (Scr->EntryHeight / 2);	/* sticky menus would be nice here */
+      } else {
+	y -= (menu->width / 2);
+	x -= (Scr->EntryHeight / 2);	/* sticky menus would be nice here */
+      }
+
+      if (Scr->MenuAtLeft == TRUE) {
+	if (VMenu(Scr))
+	  x -= menu->width / 4;
+	else
+	  y -= menu->width / 4;
+      } else {
+	if (VMenu(Scr))
+	  x += menu->width / 4;
+	else
+	  y += menu->width / 4;
+      }
+    } else {
+      if (Scr->MenuAtLeft == TRUE) {
+	if (VMenu(Scr))
+	  x -= menu->width;
+	else
+	  y -= menu->width;
+      }
     }
+    if (Scr->MenuRuns == MenuRuns_B2T)
+      y -= menu->height - Scr->EntryHeight;
+    else if (Scr->MenuRuns == MenuRuns_R2L)
+      x -= menu->height - Scr->EntryHeight;
 
     /*
      * clip to screen
      */
-    if (x + menu->width > Scr->MyDisplayWidth) {
+    if (VMenu(Scr) && x + menu->width > Scr->MyDisplayWidth) {
 	x = Scr->MyDisplayWidth - menu->width;
     }
+    if (HMenu(Scr) && x + menu->height > Scr->MyDisplayWidth) {
+	x = Scr->MyDisplayWidth - menu->height;
+    }
     if (x < 0) x = 0;
-    if (y + menu->height > Scr->MyDisplayHeight) {
+    if (VMenu(Scr) && y + menu->height > Scr->MyDisplayHeight) {
 	y = Scr->MyDisplayHeight - menu->height;
+    }
+    if (HMenu(Scr) && y + menu->width > Scr->MyDisplayHeight) {
+	y = Scr->MyDisplayHeight - menu->width;
     }
     if (y < 0) y = 0;
 
@@ -1178,8 +1338,13 @@ resizeFromCenter(Window w, TwmWindow *tmp_win)
   namelen = strlen (tmp_win->name);
 #endif
   bw2 = tmp_win->frame_bw * 2;
-  AddingW = tmp_win->attr.width + bw2;
-  AddingH = tmp_win->attr.height + tmp_win->title_height + bw2;
+  if (tmp_win->title_pos == TP_TOP || tmp_win->title_pos == TP_BOTTOM) {
+    AddingW = tmp_win->attr.width + bw2;
+    AddingH = tmp_win->attr.height + tmp_win->title_height + bw2;
+  } else {
+    AddingW = tmp_win->attr.width + tmp_win->title_height + bw2;
+    AddingH = tmp_win->attr.height + bw2;
+  }
 #if 0
   width = (SIZE_HINDENT + MyFont_TextWidth (&Scr->SizeFont,
 					     tmp_win->name, namelen));
@@ -1205,11 +1370,19 @@ resizeFromCenter(Window w, TwmWindow *tmp_win)
   lastx = -10000;
   lasty = -10000;
 #if 0
+#if 1
+  MoveOutline(Scr->Root,
+	      origDragX - JunkBW, origDragY - JunkBW,
+	      DragWidth * JunkBW, DragHeight * JunkBW,
+	      tmp_win->frame_bw,
+	      tmp_win->title_height, tmp_win->title_pos);
+#else
   MoveOutline(Scr->Root,
 	      origDragX - JunkBW, origDragY - JunkBW,
 	      DragWidth * JunkBW, DragHeight * JunkBW,
 	      tmp_win->frame_bw,
 	      tmp_win->title_height);
+#endif
 #endif
   MenuStartResize(tmp_win, origDragX, origDragY, DragWidth, DragHeight);
   while (TRUE)
@@ -1614,7 +1787,8 @@ ExecuteFunction(int func, const char *action, Window w, TwmWindow *tmp_win,
 		    origDragX - JunkBW, origDragY - JunkBW,
 		    DragWidth + 2 * JunkBW, DragHeight + 2 * JunkBW,
 		    tmp_win->frame_bw,
-		    moving_icon ? 0 : tmp_win->title_height);
+		    moving_icon ? 0 : tmp_win->title_height,
+		    tmp_win->title_pos);
 		/*
 		 * This next line causes HandleReleaseNotify to call
 		 * XRaiseWindow().  This is solely to preserve the
@@ -1671,7 +1845,7 @@ ExecuteFunction(int func, const char *action, Window w, TwmWindow *tmp_win,
 		    if (Scr->OpaqueMove)
 		      XMoveWindow (dpy, DragWindow, origDragX, origDragY);
 		    else
-		        MoveOutline(Scr->Root, 0, 0, 0, 0, 0, 0);
+		        MoveOutline(Scr->Root, 0, 0, 0, 0, 0, 0, 0);
 		    DragWindow = None;
                 }
 	    }
@@ -1696,7 +1870,7 @@ ExecuteFunction(int func, const char *action, Window w, TwmWindow *tmp_win,
 	    }
 	    if (Event.type == releaseEvent)
 	    {
-		MoveOutline(rootw, 0, 0, 0, 0, 0, 0);
+		MoveOutline(rootw, 0, 0, 0, 0, 0, 0, 0);
 		if (moving_icon &&
 		    ((CurrentDragX != origDragX ||
 		      CurrentDragY != origDragY)))
@@ -1784,7 +1958,8 @@ ExecuteFunction(int func, const char *action, Window w, TwmWindow *tmp_win,
 		    else
 			MoveOutline(eventp->xmotion.root, xl, yt, w, h,
 			    tmp_win->frame_bw,
-			    moving_icon ? 0 : tmp_win->title_height);
+			    moving_icon ? 0 : tmp_win->title_height,
+			    tmp_win->title_pos);
 		}
 	    }
 	    else if (DragWindow != None)
@@ -1824,7 +1999,8 @@ ExecuteFunction(int func, const char *action, Window w, TwmWindow *tmp_win,
 		else
 		    MoveOutline(eventp->xmotion.root, xl, yt, w, h,
 			tmp_win->frame_bw,
-			moving_icon ? 0 : tmp_win->title_height);
+			moving_icon ? 0 : tmp_win->title_height,
+			tmp_win->title_pos);
 	    }
 
 	}
@@ -2092,14 +2268,25 @@ ExecuteFunction(int func, const char *action, Window w, TwmWindow *tmp_win,
 
     case F_WARPTO:
 	{
+	    static TwmWindow *last_win = NULL;
 	    register TwmWindow *t;
 	    int len;
 
 	    len = strlen(action);
 
-	    for (t = Scr->TwmRoot.next; t != NULL; t = t->next) {
+	    for (t = Scr->TwmRoot.next; t != NULL; t = t->next)
+		if (t == last_win) break;
+	    if (t) for (t = t->next; t != NULL; t = t->next) {
 		if (!strncmp(action, t->name, len))
                     if (WarpThere(t)) break;
+		if (!strncmp(action, t->icon_name, len))
+		    if (WarpThere(t)) break;
+	    }
+	    if (!t) for (t = Scr->TwmRoot.next; t != NULL; t = t->next) {
+	        if (!strncmp(action, t->name, len))
+		    if (WarpThere(t)) break;
+		if (!strncmp(action, t->icon_name, len))
+		    if (WarpThere(t)) break;
 	    }
 	    if (!t) {
 		for (t = Scr->TwmRoot.next; t != NULL; t = t->next) {
@@ -2116,6 +2303,8 @@ ExecuteFunction(int func, const char *action, Window w, TwmWindow *tmp_win,
 
 	    if (!t)
 		Bell(XkbBI_MinorError,0,None);
+	    else
+		last_win = t;
 	}
 	break;
 
@@ -2247,6 +2436,38 @@ ExecuteFunction(int func, const char *action, Window w, TwmWindow *tmp_win,
 	fprintf (stderr, "%s:  unable to start:  %s\n", ProgramName, *Argv);
 	break;
 
+   case  F_TITLEPOS:
+      { int pos = -1;
+	if (strcasecmp(action, "top") == 0)
+	    pos = TP_TOP;
+	else if (strcasecmp(action, "left") == 0)
+	    pos = TP_LEFT;
+	else if (strcasecmp(action, "bottom") == 0)
+	    pos = TP_BOTTOM;
+	else if (strcasecmp(action, "right") == 0)
+	    pos = TP_RIGHT;
+	if (context == C_TITLE) {
+	   if (pos != tmp_win->title_pos)
+		ChangeTitlePos(tmp_win, pos);
+	} else {
+	    Scr->TitlePosDynamic = pos;
+	}
+      }
+	break;
+
+   case  F_TITLESQZ:
+	if (context != C_TITLE)
+		break;
+	if (strcasecmp(action, "left") == 0)
+	    ChangeSqueeze(tmp_win, J_LEFT);
+	else if (strcasecmp(action, "center") == 0)
+	    ChangeSqueeze(tmp_win, J_CENTER);
+	else if (strcasecmp(action, "right") == 0)
+	    ChangeSqueeze(tmp_win, J_RIGHT);
+	else if (strcasecmp(action, "none") == 0)
+	    ChangeSqueeze(tmp_win, -1);
+
+	break;
     }
 
     if (ButtonPressed == -1) XUngrabPointer(dpy, CurrentTime);
@@ -2818,6 +3039,14 @@ DestroyMenu (MenuRoot *menu)
     for (item = menu->first; item; ) {
 	MenuItem *tmp = item;
 	item = item->next;
+	if (tmp->pixmap_0) {
+	  XFreePixmap(dpy, tmp->pixmap_0);
+	  tmp->pixmap_0 = None;
+	}
+	if (tmp->pixmap_1) {
+	  XFreePixmap(dpy, tmp->pixmap_1);
+	  tmp->pixmap_1 = None;
+	}
 	free (tmp);
     }
 }
@@ -2864,13 +3093,14 @@ WarpAlongRing (XButtonEvent *ev, Bool forward)
 	    p->ring.cursor_valid = True;
 	    p->ring.curs_x = ev->x_root - t->frame_x;
 	    p->ring.curs_y = ev->y_root - t->frame_y;
+	    p->ring.curs_x -= t->frame_bw;
+	    p->ring.curs_y -= t->frame_bw;
 	    if (p->ring.curs_x < -p->frame_bw ||
 		p->ring.curs_x >= p->frame_width + p->frame_bw ||
 		p->ring.curs_y < -p->frame_bw ||
 		p->ring.curs_y >= p->frame_height + p->frame_bw) {
 		/* somehow out of window */
-		p->ring.curs_x = p->frame_width / 2;
-		p->ring.curs_y = p->frame_height / 2;
+		set_pos(&p->ring.curs_x, &p->ring.curs_y, p, Scr->WarpCursorPos);
 	    }
 	}
     }
@@ -2888,8 +3118,7 @@ WarpToWindow (TwmWindow *t)
 	x = t->ring.curs_x;
 	y = t->ring.curs_y;
     } else {
-	x = t->frame_width / 2;
-	y = t->frame_height / 2;
+	set_pos(&x, &y, t, Scr->WarpCursorPos);
     }
     XWarpPointer (dpy, None, t->frame, 0, 0, 0, 0, x, y);
 }

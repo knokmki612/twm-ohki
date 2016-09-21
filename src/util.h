@@ -62,7 +62,7 @@ in this Software without prior written authorization from The Open Group.
 #define _UTIL_
 
 extern void MoveOutline ( Window root, int x, int y, int width, int height,
-			  int bw, int th );
+			  int bw, int th, int pos );
 extern void Zoom ( Window wf, Window wt );
 extern char * ExpandFilename ( const char *name );
 extern void GetUnknownIcon ( const char *name );
@@ -81,7 +81,10 @@ extern void MyFont_DrawImageString( Display *dpy, Drawable d, MyFont *font,
 				    GC gc, int x, int y, const char * string,
 				    int len);
 extern void MyFont_DrawString( Display *dpy, Drawable d, MyFont *font, GC gc,
-                               int x, int y, const char * string, int len);
+			       int x, int y, const char * string, int len);
+extern void MyFont_DrawString_Rotated( Display *dpy, Drawable d, MyFont *font,
+				       GC gc, int x, int y, const char * string,
+				       int len, Pixmap * pixp);
 extern void MyFont_ChangeGC( unsigned long fix_fore, unsigned long fix_back,
 			     MyFont *fix_font);
 extern Status I18N_FetchName( Display *dpy, Window win, char **winname);
