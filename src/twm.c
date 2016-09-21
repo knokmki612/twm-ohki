@@ -882,6 +882,8 @@ RestoreWithdrawnLocation (TwmWindow *tmp)
 		      &JunkWidth, &JunkHeight, &bw, &JunkDepth)) {
 
 	GetGravityOffsets (tmp, &gravx, &gravy);
+	if (tmp->title_pos == TP_TOP && gravy < 0)
+	    xwc.y -= tmp->title_height;
 
 	if (bw != tmp->old_bw) {
 	    int xoff, yoff;

@@ -742,6 +742,9 @@ AddWindow(Window w, int iconm, IconMgr *iconp)
 	}
       }
     } else {				/* put it where asked, mod title bar */
+	/* if the gravity is towards the top, move it by the title height */
+	if (tmp_win->title_pos == TP_TOP && gravy < 0)
+	    tmp_win->attr.y -= gravy * tmp_win->title_height;
     }
 
 
