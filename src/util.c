@@ -734,67 +734,66 @@ MyFont_DrawString_Rotated(Display *dpy, Drawable d, MyFont *font, GC gc,
     h = font->height;
     w = MyFont_TextWidth(font, string, len);
 
-    if (*pixp == None) {
-	XImage *title_h, *title_v;
-	Pixmap title_pix;
-	GC MonoGC;
-	int i, j;
+    XImage *title_h, *title_v;
+    Pixmap title_pix;
+    GC MonoGC;
+    int i, j;
 
-	/* draw a title horizontally to a monochrome pixmap */
-	title_pix = XCreatePixmap(dpy, Scr->Root, w, h, 1);
-	MonoGC = XCreateGC(dpy, title_pix, 0, NULL);
-	XSetForeground(dpy, MonoGC, WhitePixel(dpy, Scr->screen));
-	XSetBackground(dpy, MonoGC, WhitePixel(dpy, Scr->screen));
-	XFillRectangle(dpy, title_pix, MonoGC, 0, 0, w, h);
-	if (!use_fontset)
-	    XSetFont(dpy, MonoGC, font->font->fid);
-	XSetForeground(dpy, MonoGC, BlackPixel(dpy, Scr->screen));
+    /* draw a title horizontally to a monochrome pixmap */
+    title_pix = XCreatePixmap(dpy, Scr->Root, w, h, 1);
+    MonoGC = XCreateGC(dpy, title_pix, 0, NULL);
+    XSetForeground(dpy, MonoGC, WhitePixel(dpy, Scr->screen));
+    XSetBackground(dpy, MonoGC, WhitePixel(dpy, Scr->screen));
+    XFillRectangle(dpy, title_pix, MonoGC, 0, 0, w, h);
+    if (!use_fontset)
+	XSetFont(dpy, MonoGC, font->font->fid);
+    XSetForeground(dpy, MonoGC, BlackPixel(dpy, Scr->screen));
 
-	MyFont_DrawString (dpy, title_pix, font,
-			   MonoGC, 0, font->y,
-			   string, len);
+    MyFont_DrawString (dpy, title_pix, font,
+		       MonoGC, 0, font->y,
+		       string, len);
 
-	title_h = XGetImage(dpy, title_pix, 0, 0, w, h, AllPlanes, XYPixmap);
-	XFreeGC(dpy, MonoGC);
-	XFreePixmap(dpy, title_pix);
-	if (title_h == NULL) {
-	    fprintf(stderr,
-		    "MyFont_DrawString_Rotated(): can't get title image\n");
-	    return;
-	}
-
-	/* allocate XImage for Rotated Title */
-	title_v = XCreateImage(dpy, 0, 1, XYBitmap, 0, NULL, h, w, 8, 0);
-	if (title_v == NULL) {
-	    fprintf(stderr, "MyFont_DrawString_Rotated(): can't alloc XImage\n");
-	    XDestroyImage(title_h);
-	    return;
-	}
-	title_v->data = (char *)calloc(1, title_v->bytes_per_line * w);
-	if (title_v->data == NULL) {
-	    fprintf(stderr,
-		    "MyFont_DrawString_Rotated(): can't alloc XImage data\n");
-	    XDestroyImage(title_h);
-	    XDestroyImage(title_v);
-	    return;
-	}
-	/* rotate CW */
-	for (i = 0; i < h; i++)
-	    for (j = 0; j < w; j++)
-		XPutPixel(title_v, i, j,
-			  XGetPixel(title_h, j, h-1-i)?0:1);
-	XDestroyImage(title_h);
-
-	/* put image to pixmap */
-	*pixp = XCreatePixmap(dpy, Scr->Root,
-			      h, w, Scr->d_depth);
-	/* XSetForeground(dpy, gc, Gcv.background); */
-	XFillRectangle(dpy, *pixp, gc, 0, 0, h, w);
-	/* XSetForeground(dpy, gc, Gcv.foreground); */
-	XPutImage(dpy, *pixp, gc, title_v,
-		  0, 0, 0, 0, h, w);
-	XDestroyImage(title_v);
+    title_h = XGetImage(dpy, title_pix, 0, 0, w, h, AllPlanes, XYPixmap);
+    XFreeGC(dpy, MonoGC);
+    XFreePixmap(dpy, title_pix);
+    if (title_h == NULL) {
+	fprintf(stderr,
+		"MyFont_DrawString_Rotated(): can't get title image\n");
+	return;
     }
+
+    /* allocate XImage for Rotated Title */
+    title_v = XCreateImage(dpy, 0, 1, XYBitmap, 0, NULL, h, w, 8, 0);
+    if (title_v == NULL) {
+	fprintf(stderr, "MyFont_DrawString_Rotated(): can't alloc XImage\n");
+	XDestroyImage(title_h);
+	return;
+    }
+    title_v->data = (char *)calloc(1, title_v->bytes_per_line * w);
+    if (title_v->data == NULL) {
+	fprintf(stderr,
+		"MyFont_DrawString_Rotated(): can't alloc XImage data\n");
+	XDestroyImage(title_h);
+	XDestroyImage(title_v);
+	return;
+    }
+    /* rotate CW */
+    for (i = 0; i < h; i++)
+	for (j = 0; j < w; j++)
+	    XPutPixel(title_v, i, j,
+		      XGetPixel(title_h, j, h-1-i)?0:1);
+    XDestroyImage(title_h);
+
+    /* put image to pixmap */
+    *pixp = XCreatePixmap(dpy, Scr->Root,
+			  h, w, Scr->d_depth);
+    /* XSetForeground(dpy, gc, Gcv.background); */
+    XFillRectangle(dpy, *pixp, gc, 0, 0, h, w);
+    /* XSetForeground(dpy, gc, Gcv.foreground); */
+    XPutImage(dpy, *pixp, gc, title_v,
+	      0, 0, 0, 0, h, w);
+    XDestroyImage(title_v);
+
     XCopyArea(dpy, *pixp, d, gc, 0, 0, h, w, y, x);
 }
 
