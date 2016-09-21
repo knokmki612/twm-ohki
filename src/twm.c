@@ -101,6 +101,8 @@ int HasShape;			/* server supports shape extension? */
 int ShapeEventBase, ShapeErrorBase;
 int HasSync;			/* server supports SYNC extension? */
 int SyncEventBase, SyncErrorBase;
+int HasRandr;			/* server supports Randr extension? */
+int RandrEventBase, RandrErrorBase;
 ScreenInfo **ScreenList;	/* structures for each screen */
 ScreenInfo *Scr = NULL;		/* the cur and prev screens */
 int PreviousScreen;		/* last screen that we were on */
@@ -349,6 +351,7 @@ main(int argc, char *argv[])
 
     HasShape = XShapeQueryExtension (dpy, &ShapeEventBase, &ShapeErrorBase);
     HasSync = XSyncQueryExtension(dpy,  &SyncEventBase, &SyncErrorBase);
+    HasRandr = XRRQueryExtension(dpy,  &RandrEventBase, &RandrErrorBase);
     TwmContext = XUniqueContext();
     MenuContext = XUniqueContext();
     IconManagerContext = XUniqueContext();
@@ -462,6 +465,8 @@ main(int argc, char *argv[])
 	Scr->DontSqueezeTitleL = NULL;
 	Scr->WindowRingL = NULL;
 	Scr->WarpCursorL = NULL;
+	if (HasRandr)
+	    XRRSelectInput(dpy, RootWindow(dpy, scrnum), True);
 	/* remember to put an initialization in InitVariables also
 	 */
 
@@ -555,6 +560,15 @@ main(int argc, char *argv[])
 	Scr->tbpm.menu = None;
 	Scr->tbpm.delete = None;
 
+	Scr->WarpCursorPos = 0;
+	Scr->MenuAtLeft = FALSE;
+	Scr->MenuRuns = MenuRuns_T2B;
+	Scr->TitlePos = -1;
+	Scr->TitlePosDynamic = -1;
+	Scr->TitlePosTopL = NULL;
+	Scr->TitlePosLeftL = NULL;
+	Scr->TitlePosBottomL = NULL;
+	Scr->TitlePosRightL = NULL;
 	InitVariables();
 	InitMenus();
 
@@ -562,12 +576,17 @@ main(int argc, char *argv[])
 	ParseTwmrc(InitFile);
 	assign_var_savecolor(); /* storeing pixels for twmrc "entities" */
 	if (Scr->SqueezeTitle == -1) Scr->SqueezeTitle = FALSE;
+	if (Scr->TitlePos == -1) Scr->TitlePos = TP_TOP;
+	if (HMenu(Scr))
+	  NewFontCursor(&Scr->MenuCursor, "sb_up_arrow");
 	if (!Scr->HaveFonts) CreateFonts();
 	CreateGCs();
 	MakeMenus();
 
 	Scr->TitleBarFont.y += Scr->FramePadding;
 	Scr->TitleHeight = Scr->TitleBarFont.height + Scr->FramePadding * 2;
+	if (Scr->TitleBarFont.height < 4)	/* XXX */
+		Scr->TitleHeight = 1;
 	/* make title height be odd so buttons look nice and centered */
 	if (!(Scr->TitleHeight & 1)) Scr->TitleHeight++;
 
@@ -770,6 +789,15 @@ InitVariables(void)
     Scr->FocusRoot = TRUE;
     Scr->Focus = NULL;
     Scr->WarpCursor = FALSE;
+    Scr->WarpCursorPos = 0;
+    Scr->MenuAtLeft = FALSE;
+    Scr->MenuRuns = MenuRuns_T2B;
+    Scr->TitlePos = -1;
+    Scr->TitlePosDynamic = -1;
+    FreeList(&Scr->TitlePosTopL);
+    FreeList(&Scr->TitlePosLeftL);
+    FreeList(&Scr->TitlePosBottomL);
+    FreeList(&Scr->TitlePosRightL);
     Scr->ForceIcon = FALSE;
     Scr->NoGrabServer = FALSE;
     Scr->NoRaiseMove = FALSE;
@@ -854,7 +882,6 @@ RestoreWithdrawnLocation (TwmWindow *tmp)
 		      &JunkWidth, &JunkHeight, &bw, &JunkDepth)) {
 
 	GetGravityOffsets (tmp, &gravx, &gravy);
-	if (gravy < 0) xwc.y -= tmp->title_height;
 
 	if (bw != tmp->old_bw) {
 	    int xoff, yoff;

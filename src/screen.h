@@ -215,6 +215,21 @@ typedef struct ScreenInfo
     short AutoRelativeResize;	/* start resize relative to position in quad */
     short FocusRoot;		/* is the input focus on the root ? */
     short WarpCursor;		/* warp cursor on de-iconify ? */
+    short WarpCursorPos;	/* pos to warp cursor on de-iconify ? */
+    short MenuAtLeft;		/* place menu on left side */
+    short MenuRuns;		/* place menu items */
+#define MenuRuns_T2B	0		/* Top to Bottom */
+#define MenuRuns_B2T	1		/* Bottom to Top */
+#define MenuRuns_R2L	2		/* Right to Left */
+#define MenuRuns_L2R	3		/* Left to Right */
+#define	VMenu(x) ((((x)->MenuRuns) & 2) == 0)
+#define	HMenu(x) ((((x)->MenuRuns) & 2) == 2)
+    short TitlePos;		/* title bar position */
+    short TitlePosDynamic;	/* title bar position dynamic override */
+    name_list *TitlePosTopL;	/* windows which have title at top */
+    name_list *TitlePosLeftL;	/* windows which have title at left */
+    name_list *TitlePosBottomL;	/* windows which have title at bottom */
+    name_list *TitlePosRightL;	/* windows which have title at right */
     short ForceIcon;		/* force the icon to the user specified */
     short NoGrabServer;		/* don't do server grabs */
     short NoRaiseMove;		/* don't raise window following move */

@@ -74,5 +74,7 @@ extern void SetFrameShape ( TwmWindow *tmp );
 extern void SetupFrame ( TwmWindow *tmp_win, int x, int y, int w, int h, int bw, Bool sendEvent );
 extern void SetupWindow ( TwmWindow *tmp_win, int x, int y, int w, int h, int bw );
 extern void StartResize ( XEvent *evp, TwmWindow *tmp_win, Bool fromtitlebar );
+extern void ChangeTitlePos ( TwmWindow *tmp_win, int pos );
+extern void ChangeSqueeze ( TwmWindow *tmp_win, int justify );
 
 #endif /* _RESIZE_ */

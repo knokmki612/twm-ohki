@@ -184,7 +184,7 @@ StartResize(XEvent *evp, TwmWindow *tmp_win, Bool fromtitlebar)
     MoveOutline (Scr->Root, dragx - tmp_win->frame_bw,
 		 dragy - tmp_win->frame_bw, dragWidth + 2 * tmp_win->frame_bw,
 		 dragHeight + 2 * tmp_win->frame_bw,
-		 tmp_win->frame_bw, tmp_win->title_height);
+		 tmp_win->frame_bw, tmp_win->title_height, tmp_win->title_pos);
 }
 
 
@@ -216,13 +216,14 @@ MenuStartResize(TwmWindow *tmp_win, int x, int y, int w, int h)
 		 dragy - tmp_win->frame_bw,
 		 dragWidth + 2 * tmp_win->frame_bw,
 		 dragHeight + 2 * tmp_win->frame_bw,
-		 tmp_win->frame_bw, tmp_win->title_height);
+		 tmp_win->frame_bw, tmp_win->title_height, tmp_win->title_pos);
 }
 
 /**
  * begin a windorew resize operation from AddWindow
  *  \param tmp_win the TwmWindow pointer
  */
+
 void
 AddStartResize(TwmWindow *tmp_win, int x, int y, int w, int h)
 {
@@ -347,7 +348,7 @@ MenuDoResize(int x_root, int y_root, TwmWindow *tmp_win)
             dragy - tmp_win->frame_bw,
             dragWidth + 2 * tmp_win->frame_bw,
             dragHeight + 2 * tmp_win->frame_bw,
-	    tmp_win->frame_bw, tmp_win->title_height);
+	    tmp_win->frame_bw, tmp_win->title_height, tmp_win->title_pos);
     }
 
     DisplaySize(tmp_win, dragWidth, dragHeight);
@@ -462,7 +463,7 @@ DoResize(int x_root, int y_root, TwmWindow *tmp_win)
             dragy - tmp_win->frame_bw,
             dragWidth + 2 * tmp_win->frame_bw,
             dragHeight + 2 * tmp_win->frame_bw,
-	    tmp_win->frame_bw, tmp_win->title_height);
+	    tmp_win->frame_bw, tmp_win->title_height, tmp_win->title_pos);
     }
 
     DisplaySize(tmp_win, dragWidth, dragHeight);
@@ -488,8 +489,13 @@ DisplaySize(TwmWindow *tmp_win, int width, int height)
     last_width = width;
     last_height = height;
 
+  if (tmp_win->title_pos == TP_TOP || tmp_win->title_pos == TP_BOTTOM) {
     dheight = height - tmp_win->title_height;
     dwidth = width;
+  } else {
+    dheight = height;
+    dwidth = width - tmp_win->title_height;
+  }
 
     /*
      * ICCCM says that PMinSize is the default is no PBaseSize is given,
@@ -533,7 +539,7 @@ EndResize(void)
     fprintf(stderr, "EndResize\n");
 #endif
 
-    MoveOutline(Scr->Root, 0, 0, 0, 0, 0, 0);
+    MoveOutline(Scr->Root, 0, 0, 0, 0, 0, 0, 0);
     XUnmapWindow(dpy, Scr->SizeWindow);
 
     XFindContext(dpy, ResizeWindow, TwmContext, (caddr_t *)&tmp_win);
@@ -569,7 +575,7 @@ EndResize(void)
 void
 MenuEndResize(TwmWindow *tmp_win)
 {
-    MoveOutline(Scr->Root, 0, 0, 0, 0, 0, 0);
+    MoveOutline(Scr->Root, 0, 0, 0, 0, 0, 0, 0);
     XUnmapWindow(dpy, Scr->SizeWindow);
     ConstrainSize (tmp_win, &dragWidth, &dragHeight);
     AddingX = dragx - tmp_win->frame_bw;
@@ -617,6 +623,9 @@ ConstrainSize (TwmWindow *tmp_win, int *widthp, int *heightp)
     int dwidth = *widthp, dheight = *heightp;
 
 
+  if (tmp_win->title_pos == TP_LEFT || tmp_win->title_pos == TP_RIGHT)
+    dwidth -= tmp_win->title_height;
+  else
     dheight -= tmp_win->title_height;
 
     if (tmp_win->hints.flags & PMinSize) {
@@ -724,8 +733,13 @@ ConstrainSize (TwmWindow *tmp_win, int *widthp, int *heightp)
     /*
      * Fourth, account for border width and title height
      */
+  if (tmp_win->title_pos == TP_LEFT || tmp_win->title_pos == TP_RIGHT) {
+    *widthp = dwidth + tmp_win->title_height;
+    *heightp = dheight;
+  } else {
     *widthp = dwidth;
     *heightp = dheight + tmp_win->title_height;
+  }
 }
 
 
@@ -778,8 +792,14 @@ void SetupFrame (TwmWindow *tmp_win, int x, int y, int w, int h, int bw, Bool se
       bw = tmp_win->frame_bw;		/* -1 means current frame width */
 
     if (tmp_win->iconmgr) {
-	tmp_win->iconmgrp->width = w;
-        h = tmp_win->iconmgrp->height + tmp_win->title_height;
+	if (tmp_win->title_pos == TP_TOP ||
+	    tmp_win->title_pos == TP_BOTTOM) {
+	    tmp_win->iconmgrp->width = w;
+	    h = tmp_win->iconmgrp->height + tmp_win->title_height;
+	} else {
+	    tmp_win->iconmgrp->width = w - tmp_win->title_height;
+	    h = tmp_win->iconmgrp->height;
+	}
     }
 
     /*
@@ -796,12 +816,33 @@ void SetupFrame (TwmWindow *tmp_win, int x, int y, int w, int h, int bw, Bool se
     title_width = xwc.width = w;
     title_height = Scr->TitleHeight + bw;
 
+  if (tmp_win->title_pos == TP_LEFT || tmp_win->title_pos == TP_RIGHT) {
+    /* title_width actually means height of title */
+    title_width = h;
+    ComputeWindowTitleOffsets (tmp_win, h, True);
+  } else
     ComputeWindowTitleOffsets (tmp_win, xwc.width, True);
 
     reShape = (tmp_win->wShaped ? TRUE : FALSE);
     if (tmp_win->squeeze_info)		/* check for title shaping */
     {
 	title_width = tmp_win->rightx + Scr->TBInfo.rightoff;
+      if (tmp_win->title_pos == TP_LEFT || tmp_win->title_pos == TP_RIGHT) {
+	if (title_width < h)
+	{
+	    xwc.width = title_width;
+	    if (tmp_win->frame_height != h ||
+		tmp_win->frame_width != w ||
+		tmp_win->frame_bw != bw ||
+		title_width != tmp_win->title_width)
+		reShape = TRUE;
+	}
+	else
+	{
+	    if (!tmp_win->wShaped) reShape = TRUE;
+	    title_width = h;
+	}
+      } else {
 	if (title_width < xwc.width)
 	{
 	    xwc.width = title_width;
@@ -816,6 +857,7 @@ void SetupFrame (TwmWindow *tmp_win, int x, int y, int w, int h, int bw, Bool se
 	    if (!tmp_win->wShaped) reShape = TRUE;
 	    title_width = xwc.width;
 	}
+      }
     }
 
     tmp_win->title_width = title_width;
@@ -828,10 +870,29 @@ void SetupFrame (TwmWindow *tmp_win, int x, int y, int w, int h, int bw, Bool se
 	    tmp_win->title_y = xwc.y = -bw;
 	    xwcm |= (CWX | CWY | CWBorderWidth);
 	}
+	if (tmp_win->squeeze_info == NULL && tmp_win->title_pos != TP_TOP) {
+	    /* can't call ComputeTitleLocation() yet! */
+	    tmp_win->title_x = -bw;
+	    tmp_win->title_y = -bw;
+	    if (tmp_win->title_pos == TP_BOTTOM)
+		tmp_win->title_y += (h - tmp_win->title_height + bw);
+	    if (tmp_win->title_pos == TP_RIGHT)
+		tmp_win->title_x += (w - tmp_win->title_height + bw);
+	    xwc.x = tmp_win->title_x;
+	    xwc.y = tmp_win->title_y;
+	    xwcm |= (CWX | CWY);
+	}
+	if (tmp_win->title_pos == TP_LEFT || tmp_win->title_pos == TP_RIGHT) {
+	    xwcm |= CWHeight;
+	    xwc.height = title_width;
+	    xwcm &= ~CWWidth;
+	    /* xwc.width = Scr->TitleHeight */;
+	}
 
 	XConfigureWindow(dpy, tmp_win->title_w, xwcm, &xwc);
     }
 
+  if (tmp_win->title_pos == TP_TOP || tmp_win->title_pos == TP_BOTTOM) {
     if (tmp_win->attr.width != w)
 	tmp_win->widthEverChangedByUser = True;
 
@@ -840,9 +901,35 @@ void SetupFrame (TwmWindow *tmp_win, int x, int y, int w, int h, int bw, Bool se
 
     tmp_win->attr.width = w;
     tmp_win->attr.height = h - tmp_win->title_height;
+  } else {
+    if (tmp_win->attr.width != (w - tmp_win->title_height))
+	tmp_win->widthEverChangedByUser = True;
 
-    XMoveResizeWindow (dpy, tmp_win->w, 0, tmp_win->title_height,
-		       w, h - tmp_win->title_height);
+    if (tmp_win->attr.height != h)
+	tmp_win->heightEverChangedByUser = True;
+
+    tmp_win->attr.width = w - tmp_win->title_height;
+    tmp_win->attr.height = h;
+  }
+
+    switch (tmp_win->title_pos) {
+    case TP_TOP:
+        XMoveResizeWindow (dpy, tmp_win->w, 0, tmp_win->title_height,
+			   w, h - tmp_win->title_height);
+	break;
+    case TP_BOTTOM:
+	XMoveResizeWindow (dpy, tmp_win->w, 0, 0,
+			   w, h - tmp_win->title_height);
+	break;
+    case TP_LEFT:
+	XMoveResizeWindow (dpy, tmp_win->w, tmp_win->title_height, 0,
+			   w - tmp_win->title_height, h);
+	break;
+    case TP_RIGHT:
+	XMoveResizeWindow (dpy, tmp_win->w, 0, 0,
+			   w - tmp_win->title_height, h);
+	break;
+    }
 
     /*
      * fix up frame and assign size/location values in tmp_win
@@ -874,6 +961,13 @@ void SetupFrame (TwmWindow *tmp_win, int x, int y, int w, int h, int bw, Bool se
         }
 
         xwcm = CWX | CWWidth;
+	if (tmp_win->title_pos == TP_LEFT || tmp_win->title_pos == TP_RIGHT) {
+	   xwcm &= ~CWX;
+	   xwcm |= CWY | CWHeight;
+	   xwc.y = xwc.x;
+	   xwc.height = xwc.width;
+	   xwc.width = (Scr->TitleHeight - 2 * Scr->FramePadding);
+	}
         XConfigureWindow(dpy, tmp_win->hilite_w, xwcm, &xwc);
     }
 
@@ -887,12 +981,38 @@ void SetupFrame (TwmWindow *tmp_win, int x, int y, int w, int h, int bw, Bool se
         client_event.xconfigure.display = dpy;
         client_event.xconfigure.event = tmp_win->w;
         client_event.xconfigure.window = tmp_win->w;
+    switch (tmp_win->title_pos) {
+    case TP_TOP:
         client_event.xconfigure.x = (x + tmp_win->frame_bw - tmp_win->old_bw);
         client_event.xconfigure.y = (y + tmp_win->frame_bw +
 				     tmp_win->title_height - tmp_win->old_bw);
         client_event.xconfigure.width = tmp_win->frame_width;
         client_event.xconfigure.height = tmp_win->frame_height -
                 tmp_win->title_height;
+	break;
+    case TP_BOTTOM:
+        client_event.xconfigure.x = (x + tmp_win->frame_bw - tmp_win->old_bw);
+        client_event.xconfigure.y = (y + tmp_win->frame_bw - tmp_win->old_bw);
+        client_event.xconfigure.width = tmp_win->frame_width;
+        client_event.xconfigure.height = tmp_win->frame_height -
+                tmp_win->title_height;
+	break;
+    case TP_LEFT:
+        client_event.xconfigure.x = (x + tmp_win->frame_bw +
+				     tmp_win->title_height - tmp_win->old_bw);
+        client_event.xconfigure.y = (y + tmp_win->frame_bw - tmp_win->old_bw);
+        client_event.xconfigure.width = tmp_win->frame_width -
+                tmp_win->title_height;
+        client_event.xconfigure.height = tmp_win->frame_height;
+	break;
+    case TP_RIGHT:
+        client_event.xconfigure.x = (x + tmp_win->frame_bw - tmp_win->old_bw);
+        client_event.xconfigure.y = (y + tmp_win->frame_bw - tmp_win->old_bw);
+        client_event.xconfigure.width = tmp_win->frame_width -
+		tmp_win->title_height;
+        client_event.xconfigure.height = tmp_win->frame_height;
+	break;
+    }
         client_event.xconfigure.border_width = tmp_win->old_bw;
         /* Real ConfigureNotify events say we're above title window, so ... */
 	/* what if we don't have a title ????? */
@@ -1026,15 +1146,31 @@ SetFrameShape (TwmWindow *tmp)
 	/*
 	 * need to do general case
 	 */
-	XShapeCombineShape (dpy, tmp->frame, ShapeBounding,
-			    0, tmp->title_height, tmp->w,
-			    ShapeBounding, ShapeSet);
-	if (tmp->title_w) {
+	if (tmp->title_pos == TP_TOP || tmp->title_pos == TP_BOTTOM) {
 	    XShapeCombineShape (dpy, tmp->frame, ShapeBounding,
-				tmp->title_x + tmp->frame_bw,
-				tmp->title_y + tmp->frame_bw,
-				tmp->title_w, ShapeBounding,
-				ShapeUnion);
+				0,
+			    (tmp->title_pos == TP_TOP)?tmp->title_height:0,
+				tmp->w,
+				ShapeBounding, ShapeSet);
+	    if (tmp->title_w) {
+		XShapeCombineShape (dpy, tmp->frame, ShapeBounding,
+				    tmp->title_x + tmp->frame_bw,
+				    tmp->title_y + tmp->frame_bw,
+				    tmp->title_w, ShapeBounding,
+				    ShapeUnion);
+	    }
+	} else {
+	    XShapeCombineShape (dpy, tmp->frame, ShapeBounding,
+			    (tmp->title_pos == TP_LEFT)?tmp->title_height:0,
+				0, tmp->w,
+				ShapeBounding, ShapeSet);
+	    if (tmp->title_w) {
+		XShapeCombineShape (dpy, tmp->frame, ShapeBounding,
+				    tmp->title_x + tmp->frame_bw,
+				    tmp->title_y + tmp->frame_bw,
+				    tmp->title_w, ShapeBounding,
+				    ShapeUnion);
+	    }
 	}
     } else {
 	/*
@@ -1052,28 +1188,64 @@ SetFrameShape (TwmWindow *tmp)
 	     *
 	     * The frame_width and frame_height do *not* include borders.
 	     */
+	  if (tmp->title_pos == TP_TOP || tmp->title_pos == TP_BOTTOM) {
+	    int order = (tmp->title_pos == TP_TOP)?YXBanded:Unsorted;
 	    /* border */
 	    newBounding[0].x = tmp->title_x;
 	    newBounding[0].y = tmp->title_y;
+	    if (tmp->title_pos == TP_BOTTOM)
+		newBounding[0].y += tmp->frame_bw;
 	    newBounding[0].width = tmp->title_width + fbw2;
 	    newBounding[0].height = tmp->title_height;
 	    newBounding[1].x = -tmp->frame_bw;
-	    newBounding[1].y = Scr->TitleHeight;
+	    newBounding[1].y = (tmp->title_pos == TP_TOP)?
+				Scr->TitleHeight : -tmp->frame_bw;
 	    newBounding[1].width = tmp->attr.width + fbw2;
 	    newBounding[1].height = tmp->attr.height + fbw2;
 	    XShapeCombineRectangles (dpy, tmp->frame, ShapeBounding, 0, 0,
-				     newBounding, 2, ShapeSet, YXBanded);
+				     newBounding, 2, ShapeSet, order);
 	    /* insides */
 	    newClip[0].x = tmp->title_x + tmp->frame_bw;
-	    newClip[0].y = 0;
+	    newClip[0].y = (tmp->title_pos == TP_TOP)?
+				0 : tmp->attr.height + tmp->frame_bw;
 	    newClip[0].width = tmp->title_width;
 	    newClip[0].height = Scr->TitleHeight;
 	    newClip[1].x = 0;
-	    newClip[1].y = tmp->title_height;
+	    newClip[1].y = (tmp->title_pos == TP_TOP)?
+				tmp->title_height : 0;
 	    newClip[1].width = tmp->attr.width;
 	    newClip[1].height = tmp->attr.height;
 	    XShapeCombineRectangles (dpy, tmp->frame, ShapeClip, 0, 0,
-				     newClip, 2, ShapeSet, YXBanded);
+				     newClip, 2, ShapeSet, order);
+	  } else {
+	    int order = Unsorted;
+	    /* border */
+	    newBounding[0].x = tmp->title_x;
+	    if (tmp->title_pos == TP_RIGHT)
+		newBounding[0].x += tmp->frame_bw;
+	    newBounding[0].y = tmp->title_y;
+	    newBounding[0].width = tmp->title_height;
+	    newBounding[0].height = tmp->title_width + fbw2;
+	    newBounding[1].x = (tmp->title_pos == TP_LEFT)?
+				Scr->TitleHeight : -tmp->frame_bw;
+	    newBounding[1].y = -tmp->frame_bw;
+	    newBounding[1].width = tmp->attr.width + fbw2;
+	    newBounding[1].height = tmp->attr.height + fbw2;
+	    XShapeCombineRectangles (dpy, tmp->frame, ShapeBounding, 0, 0,
+				     newBounding, 2, ShapeSet, order);
+	    /* insides */
+	    newClip[0].x = (tmp->title_pos == TP_LEFT)?
+				0 : tmp->attr.width + tmp->frame_bw;
+	    newClip[0].y = tmp->title_y + tmp->frame_bw;
+	    newClip[0].width = Scr->TitleHeight;
+	    newClip[0].height = tmp->title_width;
+	    newClip[1].x = (tmp->title_pos == TP_LEFT)?  tmp->title_height : 0;
+	    newClip[1].y = 0;
+	    newClip[1].width = tmp->attr.width;
+	    newClip[1].height = tmp->attr.height;
+	    XShapeCombineRectangles (dpy, tmp->frame, ShapeClip, 0, 0,
+				     newClip, 2, ShapeSet, order);
+	  }
 	} else {
 	    (void) XShapeCombineMask (dpy, tmp->frame, ShapeBounding, 0, 0,
  				      None, ShapeSet);
@@ -1139,3 +1311,233 @@ SetFrameShape (TwmWindow *tmp)
  * are really deltax and deltay to lower right handle corner, so they need
  * to have -1 subtracted from would normally be the actual extents.
  */
+
+
+/***********************************************************************
+ *
+ *  Procedure:
+ *      RelocateBtns - relocate buttons
+ *
+ *  Inputs:
+ *      tmp_win - the TwmWindow pointer
+ *      topbtm - TRUE when top or bottom
+ *
+ ***********************************************************************
+ */
+static void
+RelocateBtns (tmp_win, topbtm)
+    TwmWindow *tmp_win;
+    int topbtm;
+{
+    TBWindow *tbw;
+    TitleButton *tb;
+    XSetWindowAttributes attributes;
+    XWindowChanges xwc;
+    int y, leftx, rightx, boxwidth;
+
+    if (tmp_win->titlebuttons == NULL || topbtm == -1)
+	return;
+
+    leftx = y = Scr->TBInfo.leftx;
+    rightx = tmp_win->rightx;
+    boxwidth = (Scr->TBInfo.width + Scr->TBInfo.pad);
+
+    for (tb = Scr->TBInfo.head, tbw = tmp_win->titlebuttons; tb;
+	 tb = tb->next, tbw++) {
+	int x;
+
+	XConfigureWindow(dpy, tbw->window, (CWX|CWY), &xwc);
+	if (tb->rightside) {
+	    x = rightx;
+	    rightx += boxwidth;
+	    if (topbtm == TRUE) {
+		attributes.win_gravity = NorthEastGravity;
+		xwc.x = x;
+		xwc.y = y;
+	    } else {
+		attributes.win_gravity = SouthWestGravity;
+		xwc.x = y;
+		xwc.y = x;
+	    }
+	} else {
+	    x = leftx;
+	    leftx += boxwidth;
+	    if (topbtm == TRUE) {
+		xwc.x = x;
+		xwc.y = y;
+	    } else {
+		xwc.x = y;
+		xwc.y = x;
+	    }
+	    attributes.win_gravity = NorthWestGravity;
+	}
+	XChangeWindowAttributes(dpy, tbw->window, CWWinGravity, &attributes);
+	XConfigureWindow(dpy, tbw->window, (CWX|CWY), &xwc);
+    }
+}
+
+/***********************************************************************
+ *
+ *  Procedure:
+ *      ChangeTitlePos - change the position of titlebar
+ *
+ *  Inputs:
+ *      tmp_win - the TwmWindow pointer
+ *      pos - position of titlebar
+ *
+ ***********************************************************************
+ */
+void
+ChangeTitlePos (tmp_win, pos)
+    TwmWindow *tmp_win;
+    int pos;
+{
+    int h, w;
+    int x, y;
+    int reloc_btns = -1;
+
+
+    if (pos == -1 || tmp_win->title_pos == pos)
+	return; /* nothing to do */
+
+    h = tmp_win->frame_height;
+    w = tmp_win->frame_width;
+
+    /* reconfigure title window if necessary */
+    if (tmp_win->title_w) {
+	XWindowChanges xwc_w, xwc_h;
+	unsigned long xwcm_w, xwcm_h;
+	xwcm_w = xwcm_h = 0;
+	if (tmp_win->title_pos != TP_TOP && pos == TP_TOP) {
+	    xwcm_w |= CWX | CWY;
+	    xwc_w.x = - tmp_win->frame_bw;
+	    xwc_w.y = - tmp_win->frame_bw;
+	}
+	if (tmp_win->title_pos == TP_TOP || tmp_win->title_pos == TP_BOTTOM) {
+	    if (pos == TP_LEFT || pos == TP_RIGHT) {
+		xwcm_w |= CWHeight | CWWidth;
+		xwc_w.height = tmp_win->attr.height;
+		xwc_w.width = Scr->TitleHeight;
+		if (tmp_win->title_height && tmp_win->hilite_w) {
+		    /* SetupWindow() do the real work */
+		    xwcm_h |= CWHeight | CWWidth | CWX | CWY;
+		    xwc_h.height = tmp_win->attr.height;
+		    xwc_h.width = (Scr->TitleHeight - 2 * Scr->FramePadding);
+		    xwc_h.x = Scr->FramePadding;
+		    xwc_h.y = 0;
+		}
+		reloc_btns = FALSE;
+		h -= tmp_win->title_height;
+		w += tmp_win->title_height;
+	    }
+	} else {
+	    if (pos == TP_TOP || pos == TP_BOTTOM) {
+		xwcm_w |= CWHeight | CWWidth;
+		xwc_w.height = Scr->TitleHeight;
+		xwc_w.width = tmp_win->attr.width;
+		if (tmp_win->title_height && tmp_win->hilite_w) {
+		    /* SetupWindow() do the real work */
+		    xwcm_h |= CWHeight | CWWidth | CWX | CWY;
+		    xwc_h.height = (Scr->TitleHeight - 2 * Scr->FramePadding);
+		    xwc_h.width = tmp_win->attr.width;
+		    xwc_h.x = 0;
+		    xwc_h.y = Scr->FramePadding;
+		}
+		reloc_btns = TRUE;
+		h += tmp_win->title_height;
+		w -= tmp_win->title_height;
+	    }
+	}
+	if (xwcm_w)
+	    XConfigureWindow(dpy, tmp_win->title_w, xwcm_w, &xwc_w);
+	if (xwcm_h)
+	    XConfigureWindow(dpy, tmp_win->hilite_w, xwcm_h, &xwc_h);
+    }
+
+    x = tmp_win->frame_x;
+    y = tmp_win->frame_y;
+
+    if (tmp_win->title_pos == TP_TOP)
+	y += tmp_win->title_height;
+    else if (tmp_win->title_pos == TP_LEFT)
+	x += tmp_win->title_height;
+
+    if (pos == TP_TOP)
+	y -= tmp_win->title_height;
+    else if (pos == TP_LEFT)
+	x -= tmp_win->title_height;
+
+    tmp_win->title_pos = pos;
+    tmp_win->title_width = -1; /* force SetFrameShape() */
+
+
+    SetupWindow(tmp_win, x, y, w, h, tmp_win->frame_bw);
+
+    RelocateBtns (tmp_win, reloc_btns);
+}
+
+/***********************************************************************
+ *
+ *  Procedure:
+ *      ChangeSqueeze - change the squeeze status of titlebar
+ *
+ *  Inputs:
+ *      tmp_win - the TwmWindow pointer
+ *      justify - squeeze justify (J_LEFT, J_CENTER, J_RIGHT)
+ *
+ ***********************************************************************
+ */
+void
+ChangeSqueeze (tmp_win, justify)
+    TwmWindow *tmp_win;
+    int justify;
+{
+    static SqueezeInfo default_squeeze[] = {
+	{J_LEFT, 0, 0 },
+	{J_CENTER, 0, 0 },
+	{J_RIGHT, 0, 0 }
+    };
+    int i;
+
+    if (tmp_win->squeeze_info == NULL && justify == -1)
+	return; /* should not happen */
+
+    if (tmp_win->squeeze_info && tmp_win->squeeze_info->justify == justify)
+	return;
+
+    if (justify == -1) {
+	    /* need to resize title bar window */
+	    XWindowChanges xwc;
+	    unsigned long xwcm;
+
+	    if (tmp_win->title_pos == TP_TOP ||
+		tmp_win->title_pos == TP_BOTTOM) {
+		xwcm = CWWidth;
+		xwc.width = tmp_win->attr.width;
+	    } else {
+		xwcm = CWHeight;
+		xwc.height = tmp_win->attr.height;
+	    }
+	    XConfigureWindow(dpy, tmp_win->title_w, xwcm, &xwc);
+	    XConfigureWindow(dpy, tmp_win->hilite_w, xwcm, &xwc);
+
+	    tmp_win->squeeze_info = NULL;
+    } else {
+	for (i=0; i < sizeof(default_squeeze)/sizeof(default_squeeze[0]); i++)
+	    if (default_squeeze[i].justify == justify) {
+		tmp_win->squeeze_info = &default_squeeze[i];
+		break;
+	    }
+	if (i >= sizeof(default_squeeze)/sizeof(default_squeeze[0]))
+	    return;
+    }
+
+    tmp_win->title_width = -1; /* force SetFrameShape() */
+
+    SetupWindow(tmp_win, tmp_win->frame_x, tmp_win->frame_y,
+		tmp_win->frame_width, tmp_win->frame_height,
+		tmp_win->frame_bw);
+
+    if (justify == -1)
+	SetFrameShape(tmp_win);
+}

@@ -331,8 +331,12 @@ AddWindow(Window w, int iconm, IconMgr *iconp)
 			  &tmp_win->class);
 	    if (!tmp_win->squeeze_info) {
 		static SqueezeInfo default_squeeze = { J_LEFT, 0, 0 };
-		if (Scr->SqueezeTitle)
-		  tmp_win->squeeze_info = &default_squeeze;
+		if (Scr->SqueezeTitle) {
+		    tmp_win->squeeze_info = (SqueezeInfo *)
+			    LookInList (Scr->SqueezeTitleL, "*", NULL);
+		    if (!tmp_win->squeeze_info)
+			tmp_win->squeeze_info = &default_squeeze;
+		}
 	    }
 	}
       }
@@ -358,6 +362,27 @@ AddWindow(Window w, int iconm, IconMgr *iconp)
     if (tmp_win->transient && !Scr->DecorateTransients)
 	tmp_win->title_height = 0;
 
+    tmp_win->title_pixmap = None;
+    /* find specified title bar position */
+    if (tmp_win->title_height > 0) {
+	if (Scr->TitlePosDynamic != -1)
+	    tmp_win->title_pos = Scr->TitlePosDynamic;
+	else if (LookInList(Scr->TitlePosTopL,
+			    tmp_win->full_name, &tmp_win->class))
+	    tmp_win->title_pos = TP_TOP;
+	else if (LookInList(Scr->TitlePosLeftL,
+			    tmp_win->full_name, &tmp_win->class))
+	    tmp_win->title_pos = TP_LEFT;
+	else if (LookInList(Scr->TitlePosBottomL,
+			    tmp_win->full_name, &tmp_win->class))
+	    tmp_win->title_pos = TP_BOTTOM;
+	else if (LookInList(Scr->TitlePosRightL,
+			    tmp_win->full_name, &tmp_win->class))
+	    tmp_win->title_pos = TP_RIGHT;
+	else
+	    tmp_win->title_pos = Scr->TitlePos;
+    } else
+	tmp_win->title_pos = TP_TOP;
     if (LookInList(Scr->StartIconified, tmp_win->full_name, &tmp_win->class))
     {
 	if (!tmp_win->wmhints)
@@ -490,9 +515,14 @@ AddWindow(Window w, int iconm, IconMgr *iconp)
 				    SIZE_HINDENT,
 				    SIZE_VINDENT + Scr->SizeFont.ascent,
 				    tmp_win->name, namelen);
-
+	  if (tmp_win->title_pos == TP_TOP ||
+	      tmp_win->title_pos == TP_BOTTOM) {
 	    AddingW = tmp_win->attr.width + bw2;
 	    AddingH = tmp_win->attr.height + tmp_win->title_height + bw2;
+	  } else {
+	    AddingW = tmp_win->attr.width + tmp_win->title_height + bw2;
+	    AddingH = tmp_win->attr.height + bw2;
+	  }
 
   	    if (Scr->DontMoveOff) {
   		/*
@@ -510,7 +540,8 @@ AddWindow(Window w, int iconm, IconMgr *iconp)
   	    }
 
 	    MoveOutline(Scr->Root, AddingX, AddingY, AddingW, AddingH,
-	      	        tmp_win->frame_bw, tmp_win->title_height);
+			tmp_win->frame_bw, tmp_win->title_height,
+			tmp_win->title_pos);
 
 	    while (TRUE)
 		{
@@ -576,7 +607,8 @@ AddWindow(Window w, int iconm, IconMgr *iconp)
 		}
 
 		MoveOutline(Scr->Root, AddingX, AddingY, AddingW, AddingH,
-			    tmp_win->frame_bw, tmp_win->title_height);
+			    tmp_win->frame_bw, tmp_win->title_height,
+			    tmp_win->title_pos);
 
 	    }
 
@@ -599,8 +631,14 @@ AddWindow(Window w, int iconm, IconMgr *iconp)
 		    if (dx < HALF_AVE_CURSOR_SIZE) dx = HALF_AVE_CURSOR_SIZE;
 		    if (dy < HALF_AVE_CURSOR_SIZE) dy = HALF_AVE_CURSOR_SIZE;
 #undef HALF_AVE_CURSOR_SIZE
+		  if (tmp_win->title_pos == TP_TOP ||
+		      tmp_win->title_pos == TP_BOTTOM ) {
 		    dx += (tmp_win->frame_bw + 1);
 		    dy += (bw2 + tmp_win->title_height + 1);
+		  } else {
+		    dx += (bw2 + tmp_win->title_height + 1);
+		    dy += (tmp_win->frame_bw + 1);
+		  }
 		    if (AddingX + dx >= Scr->MyDisplayWidth)
 		      dx = Scr->MyDisplayWidth - AddingX - 1;
 		    if (AddingY + dy >= Scr->MyDisplayHeight)
@@ -678,22 +716,32 @@ AddWindow(Window w, int iconm, IconMgr *iconp)
 		XMaskEvent(dpy, ButtonReleaseMask, &event);
 	    }
 
-	    MoveOutline(Scr->Root, 0, 0, 0, 0, 0, 0);
+	    MoveOutline(Scr->Root, 0, 0, 0, 0, 0, 0, 0);
 	    XUnmapWindow(dpy, Scr->SizeWindow);
 	    UninstallRootColormap();
 	    XUngrabPointer(dpy, CurrentTime);
 
+	  if (tmp_win->title_pos == TP_TOP ||
+	      tmp_win->title_pos == TP_BOTTOM) {
 	    tmp_win->attr.x = AddingX;
-	    tmp_win->attr.y = AddingY + tmp_win->title_height;
+	    tmp_win->attr.y = AddingY;
+	    if (tmp_win->title_pos == TP_TOP)
+		tmp_win->attr.y += tmp_win->title_height;
 	    tmp_win->attr.width = AddingW - bw2;
 	    tmp_win->attr.height = AddingH - tmp_win->title_height - bw2;
+	  } else {
+	    tmp_win->attr.x = AddingX;
+	    if (tmp_win->title_pos == TP_LEFT)
+		tmp_win->attr.x += tmp_win->title_height;
+	    tmp_win->attr.y = AddingY;
+	    tmp_win->attr.width = AddingW - tmp_win->title_height - bw2;
+	    tmp_win->attr.height = AddingH - bw2;
+	  }
 
 	    XUngrabServer(dpy);
 	}
       }
     } else {				/* put it where asked, mod title bar */
-	/* if the gravity is towards the top, move it by the title height */
-	if (gravy < 0) tmp_win->attr.y -= gravy * tmp_win->title_height;
     }
 
 
@@ -787,12 +835,21 @@ AddWindow(Window w, int iconm, IconMgr *iconp)
 
 
     /* create windows */
-
+  if (tmp_win->title_pos == TP_TOP || tmp_win->title_pos == TP_BOTTOM) {
     tmp_win->frame_x = tmp_win->attr.x + tmp_win->old_bw - tmp_win->frame_bw;
-    tmp_win->frame_y = tmp_win->attr.y - tmp_win->title_height +
-	tmp_win->old_bw - tmp_win->frame_bw;
+    tmp_win->frame_y = tmp_win->attr.y + tmp_win->old_bw - tmp_win->frame_bw;
+    if (tmp_win->title_pos == TP_TOP)
+	tmp_win->frame_y -= tmp_win->title_height;
     tmp_win->frame_width = tmp_win->attr.width;
     tmp_win->frame_height = tmp_win->attr.height + tmp_win->title_height;
+  } else {
+    tmp_win->frame_x = tmp_win->attr.x + tmp_win->old_bw - tmp_win->frame_bw;
+    if (tmp_win->title_pos == TP_LEFT)
+	tmp_win->frame_x -= tmp_win->title_height;
+    tmp_win->frame_y = tmp_win->attr.y + tmp_win->old_bw - tmp_win->frame_bw;
+    tmp_win->frame_width = tmp_win->attr.width + tmp_win->title_height;
+    tmp_win->frame_height = tmp_win->attr.height;
+  }
 
     valuemask = CWBackPixmap | CWBorderPixel | CWCursor | CWEventMask;
     attributes.background_pixmap = None;
@@ -825,7 +882,11 @@ AddWindow(Window w, int iconm, IconMgr *iconp)
 	tmp_win->title_w = XCreateWindow (dpy, tmp_win->frame,
 					  -tmp_win->frame_bw,
 					  -tmp_win->frame_bw,
+	    (tmp_win->title_pos == TP_LEFT || tmp_win->title_pos == TP_RIGHT)?
+					  (unsigned int) Scr->TitleHeight :
 					  (unsigned int) tmp_win->attr.width,
+	    (tmp_win->title_pos == TP_LEFT || tmp_win->title_pos == TP_RIGHT)?
+					  (unsigned int) tmp_win->attr.height :
 					  (unsigned int) Scr->TitleHeight,
 					  (unsigned int) tmp_win->frame_bw,
 					  Scr->d_depth,
@@ -888,7 +949,18 @@ AddWindow(Window w, int iconm, IconMgr *iconp)
     if (!tmp_win->iconmgr)
 	XAddToSaveSet(dpy, tmp_win->w);
 
+  switch (tmp_win->title_pos) {
+  case TP_TOP:
     XReparentWindow(dpy, tmp_win->w, tmp_win->frame, 0, tmp_win->title_height);
+    break;
+  case TP_BOTTOM:
+  case TP_RIGHT:
+    XReparentWindow(dpy, tmp_win->w, tmp_win->frame, 0, 0);
+    break;
+  case TP_LEFT:
+    XReparentWindow(dpy, tmp_win->w, tmp_win->frame, tmp_win->title_height, 0);
+    break;
+  }
     /*
      * Reparenting generates an UnmapNotify event, followed by a MapNotify.
      * Set the map state to FALSE to prevent a transition back to
@@ -1150,9 +1222,15 @@ static Window CreateHighlightWindow (TwmWindow *tmp_win)
 	valuemask = CWBackPixel;
 	attributes.background_pixel = tmp_win->title.fore;
     }
-
+  if (tmp_win->title_pos == TP_TOP || tmp_win->title_pos == TP_BOTTOM)
     w = XCreateWindow (dpy, tmp_win->title_w, 0, Scr->FramePadding,
 		       (unsigned int) Scr->TBInfo.width, (unsigned int) h,
+		       (unsigned int) 0,
+		       Scr->d_depth, (unsigned int) CopyFromParent,
+		       Scr->d_visual, valuemask, &attributes);
+  else
+    w = XCreateWindow (dpy, tmp_win->title_w, Scr->FramePadding, 0,
+		       (unsigned int) h, (unsigned int) Scr->TBInfo.width,
 		       (unsigned int) 0,
 		       Scr->d_depth, (unsigned int) CopyFromParent,
 		       Scr->d_visual, valuemask, &attributes);
@@ -1212,6 +1290,9 @@ void ComputeTitleLocation (register TwmWindow *tmp)
 	int maxwidth = tmp->frame_width;
 	int tw = tmp->title_width;
 
+	if (tmp->title_pos == TP_LEFT || tmp->title_pos == TP_RIGHT) {
+	    maxwidth = tmp->attr.height;
+	}
 	/*
 	 * figure label base from squeeze info (justification fraction)
 	 */
@@ -1246,8 +1327,15 @@ void ComputeTitleLocation (register TwmWindow *tmp)
 	  basex = maxwidth - tw + 1;
 	if (basex < 0) basex = 0;
 
+      if (tmp->title_pos == TP_LEFT || tmp->title_pos == TP_RIGHT)
+	tmp->title_y = basex - tmp->frame_bw;
+      else
 	tmp->title_x = basex - tmp->frame_bw;
     }
+    if (tmp->title_pos == TP_BOTTOM)
+	tmp->title_y += tmp->attr.height + tmp->frame_bw;
+    else if (tmp->title_pos == TP_RIGHT)
+	tmp->title_x += tmp->attr.width + tmp->frame_bw;
 }
 
 
@@ -1270,7 +1358,10 @@ static void CreateWindowTitlebarButtons (TwmWindow *tmp_win)
      * create the title bar windows; let the event handler deal with painting
      * so that we don't have to spend two pixmaps (or deal with hashing)
      */
-    ComputeWindowTitleOffsets (tmp_win, tmp_win->attr.width, False);
+    ComputeWindowTitleOffsets (tmp_win,
+	    (tmp_win->title_pos == TP_TOP || tmp_win->title_pos == TP_BOTTOM)?
+		    tmp_win->attr.width : tmp_win->attr.height,
+		False);
 
     leftx = y = Scr->TBInfo.leftx;
     rightx = tmp_win->rightx;
@@ -1302,13 +1393,20 @@ static void CreateWindowTitlebarButtons (TwmWindow *tmp_win)
 		if (tb->rightside) {
 		    x = rightx;
 		    rightx += boxwidth;
+		  if (tmp_win->title_pos == TP_LEFT ||
+		      tmp_win->title_pos == TP_RIGHT)
+		    attributes.win_gravity = SouthWestGravity;
+		  else
 		    attributes.win_gravity = NorthEastGravity;
 		} else {
 		    x = leftx;
 		    leftx += boxwidth;
 		    attributes.win_gravity = NorthWestGravity;
 		}
-		tbw->window = XCreateWindow (dpy, tmp_win->title_w, x, y, h, h,
+		tbw->window = XCreateWindow (dpy, tmp_win->title_w,
+    (tmp_win->title_pos == TP_TOP || tmp_win->title_pos == TP_BOTTOM)?  x : y,
+    (tmp_win->title_pos == TP_TOP || tmp_win->title_pos == TP_BOTTOM)?  y : x,
+					     h, h,
 					     (unsigned int) Scr->TBInfo.border,
 					     0, (unsigned int) CopyFromParent,
 					     (Visual *) CopyFromParent,

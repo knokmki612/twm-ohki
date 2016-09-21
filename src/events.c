@@ -170,6 +170,8 @@ InitEvents(void)
     EventHandler[VisibilityNotify] = HandleVisibilityNotify;
     if (HasShape)
 	EventHandler[ShapeEventBase+ShapeNotify] = HandleShapeNotify;
+    if (HasRandr)
+	EventHandler[RandrEventBase+RRScreenChangeNotify] = HandleRandrNotify;
 }
 
 
@@ -1074,6 +1076,13 @@ HandleExpose(void)
 	    MyFont_ChangeGC(Tmp_win->title.fore, Tmp_win->title.back,
 		&Scr->TitleBarFont);
 
+	  if (Tmp_win->title_pos == TP_LEFT || Tmp_win->title_pos == TP_RIGHT)
+	    MyFont_DrawString_Rotated (dpy, Tmp_win->title_w,
+		&Scr->TitleBarFont,
+		Scr->NormalGC, Scr->TBInfo.titlex,
+		Scr->TitleHeight - Scr->TitleBarFont.height,
+		Tmp_win->name, strlen(Tmp_win->name), &Tmp_win->title_pixmap);
+	  else
 	    MyFont_DrawString (dpy, Tmp_win->title_w, &Scr->TitleBarFont,
 		Scr->NormalGC, Scr->TBInfo.titlex, Scr->TitleBarFont.y,
 		Tmp_win->name, strlen(Tmp_win->name));
@@ -1230,6 +1239,7 @@ HandleDestroyNotify(void)
      *     11. window ring
      */
     if (Tmp_win->gray) XFreePixmap (dpy, Tmp_win->gray);
+    if (Tmp_win->title_pixmap) XFreePixmap(dpy, Tmp_win->title_pixmap);
 
     XDestroyWindow(dpy, Tmp_win->frame);
     if (Tmp_win->icon_w && !Tmp_win->icon_not_ours) {
@@ -1510,7 +1520,7 @@ HandleButtonRelease(void)
 
     if (DragWindow != None)
     {
-	MoveOutline(Scr->Root, 0, 0, 0, 0, 0, 0);
+	MoveOutline(Scr->Root, 0, 0, 0, 0, 0, 0, 0);
 
 	if (XFindContext(dpy, DragWindow, TwmContext, &context_data) == 0)
 	    Tmp_win = (TwmWindow *) context_data;
@@ -1733,7 +1743,7 @@ HandleButtonPress(void)
 	  if (Scr->OpaqueMove && DragWindow != None) {
 	    XMoveWindow (dpy, DragWindow, origDragX, origDragY);
 	  } else {
-	    MoveOutline(Scr->Root, 0, 0, 0, 0, 0, 0);
+	    MoveOutline(Scr->Root, 0, 0, 0, 0, 0, 0, 0);
 	  }
 	}
 	XUnmapWindow(dpy, Scr->SizeWindow);
@@ -1804,8 +1814,14 @@ HandleButtonPress(void)
 		Event.xbutton.x, Event.xbutton.y,
 		&JunkX, &JunkY, &JunkChild);
 
+	  if (Tmp_win->title_pos == TP_TOP ||
+	      Tmp_win->title_pos == TP_BOTTOM) {
 	    Event.xbutton.x = JunkX;
 	    Event.xbutton.y = JunkY - Tmp_win->title_height;
+	  } else {
+	    Event.xbutton.x = JunkX - Tmp_win->title_height;
+	    Event.xbutton.y = JunkY;
+	  }
 	    Event.xany.window = Tmp_win->w;
 	    Context = C_WINDOW;
 	}
@@ -1833,6 +1849,9 @@ HandleButtonPress(void)
 	     */
 	    if (Event.xbutton.subwindow == Tmp_win->w) {
 	      Event.xbutton.window = Tmp_win->w;
+	    if (Tmp_win->title_pos == TP_LEFT)
+	       Event.xbutton.x -= Tmp_win->title_height;
+	    if (Tmp_win->title_pos == TP_TOP)
               Event.xbutton.y -= Tmp_win->title_height;
 /*****
               Event.xbutton.x -= Tmp_win->frame_bw;
@@ -2075,7 +2094,8 @@ HandleEnterNotify(void)
 			if (Tmp_win->title_w && Scr->TitleFocus &&	/* 4 */
 			    Tmp_win->wmhints && Tmp_win->wmhints->input)
 			  SetFocus (Tmp_win, ewp->time);
-			if (Scr->NoTitlebar && Scr->TitleFocus &&	/*4a */
+			if ((Scr->NoTitlebar || Scr->NoTitle != NULL) &&
+			    Scr->TitleFocus &&  /*4a */
 			    Tmp_win->wmhints && Tmp_win->wmhints->input)
 			  SetFocus (Tmp_win, ewp->time);
 			if (Tmp_win->protocols & DoesWmTakeFocus)	/* 5 */
@@ -2084,10 +2104,14 @@ HandleEnterNotify(void)
 		    } else if (ewp->window == Tmp_win->w) {
 			/*
 			 * If we are entering the application window, install
-			 * its colormap(s).
+			 * its colormap(s), unless it is icon stack.
 			 */
-			if (!scanArgs.leaves || scanArgs.inferior)
+			if ((!scanArgs.leaves || scanArgs.inferior) &&
+			    Scr->iconmgr.twm_win != Tmp_win) {
 			    InstallWindowColormaps(EnterNotify, Tmp_win);
+			    SetFocus (Tmp_win, ewp->time);      /* XXX */
+			    Scr->Focus = Tmp_win;
+			}
 		    }
 		}			/* end if Tmp_win->mapped */
 		if (Tmp_win->wmhints != NULL &&
@@ -2341,7 +2365,13 @@ HandleConfigureRequest(void)
 	    x += gravx * bwdelta;	/* change default values only */
 	    y += gravy * bwdelta;	/* ditto */
 	    bw = cre->border_width;
-	    if (Tmp_win->title_height) height += bwdelta;
+	    if (Tmp_win->title_height) {
+		if (Tmp_win->title_pos == TP_TOP ||
+		    Tmp_win->title_pos == TP_BOTTOM)
+		    height += bwdelta;
+		else
+		    width += bwdelta;
+	    }
 	    x += (gravx < 0) ? bwdelta : -bwdelta;
 	    y += (gravy < 0) ? bwdelta : -bwdelta;
 	}
@@ -2349,16 +2379,24 @@ HandleConfigureRequest(void)
     }
 
     if (cre->value_mask & CWX) {	/* override even if border change */
-	x = cre->x - bw;
+      if (Tmp_win->title_pos == TP_LEFT || Tmp_win->title_pos == TP_RIGHT)
+	x = cre->x - ((gravx < 0) ? 0 : Tmp_win->title_height) - bw;
     }
     if (cre->value_mask & CWY) {
+      if (Tmp_win->title_pos == TP_TOP || Tmp_win->title_pos == TP_BOTTOM)
 	y = cre->y - ((gravy < 0) ? 0 : Tmp_win->title_height) - bw;
     }
 
     if (cre->value_mask & CWWidth) {
+      if (Tmp_win->title_pos == TP_LEFT || Tmp_win->title_pos == TP_RIGHT)
+	width = cre->width + Tmp_win->title_height;
+      else
 	width = cre->width;
     }
     if (cre->value_mask & CWHeight) {
+      if (Tmp_win->title_pos == TP_LEFT || Tmp_win->title_pos == TP_RIGHT)
+	height = cre->height;
+      else
 	height = cre->height + Tmp_win->title_height;
     }
 
@@ -2375,6 +2413,37 @@ HandleConfigureRequest(void)
     SetupWindow (Tmp_win, x, y, width, height, bw);
 }
 
+
+/***********************************************************************
+ *
+ *  Procedure:
+ *     RRScreenChangeNotify - Randr Screen Change event handler
+ *
+ ***********************************************************************
+ */
+void
+HandleRandrNotify ()
+{
+    XRRScreenChangeNotifyEvent *rrev = (XRRScreenChangeNotifyEvent *) &Event;
+    extern ScreenInfo **ScreenList;
+    extern int NumScreens;
+    int i;
+    ScreenInfo *scp;
+
+    for (i = 0; i< NumScreens; i++) {
+	if (ScreenList[i]->Root == rrev->root) {
+	    if (ScreenList[i]->MyDisplayWidth != rrev->width) {
+		/* swap MaxWindowWidth/Height */
+		int tmp =  ScreenList[i]->MaxWindowWidth;
+		ScreenList[i]->MaxWindowWidth = ScreenList[i]->MaxWindowHeight;
+		ScreenList[i]->MaxWindowHeight = tmp;
+	    }
+	    ScreenList[i]->MyDisplayWidth = rrev->width;
+	    ScreenList[i]->MyDisplayHeight = rrev->height;
+	    break;
+	}
+    }
+}
 
 
 /**
@@ -2688,4 +2757,3 @@ dumpevent (XEvent *e)
     }
 }
 #endif /* TRACE */
-

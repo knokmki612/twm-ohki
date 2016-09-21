@@ -90,7 +90,8 @@ int HotX, HotY;
  *  \param bw           border width of the frame
  *  \param th           title height
  */
-void MoveOutline(Window root, int x, int y, int width, int height, int bw, int th)
+
+void MoveOutline(Window root, int x, int y, int width, int height, int bw, int th, int pos)
 {
     static int	lastx = 0;
     static int	lasty = 0;
@@ -98,13 +99,14 @@ void MoveOutline(Window root, int x, int y, int width, int height, int bw, int t
     static int	lastHeight = 0;
     static int	lastBW = 0;
     static int	lastTH = 0;
+    static int	lastPOS = 0;
     int		xl, xr, yt, yb, xinnerl, xinnerr, yinnert, yinnerb;
     int		xthird, ythird;
     XSegment	outline[18];
     register XSegment	*r;
 
     if (x == lastx && y == lasty && width == lastWidth && height == lastHeight
-	&& lastBW == bw && th == lastTH)
+	&& lastBW == bw && th == lastTH && pos == lastPOS)
 	return;
 
     r = outline;
@@ -116,10 +118,27 @@ void MoveOutline(Window root, int x, int y, int width, int height, int bw, int t
 	xr = lastx + lastWidth - 1;			\
 	yt = lasty;					\
 	yb = lasty + lastHeight - 1;			\
+      if (lastPOS == TP_TOP || lastPOS == TP_BOTTOM) {	\
 	xinnerl = xl + lastBW;				\
 	xinnerr = xr - lastBW;				\
-	yinnert = yt + lastTH + lastBW;			\
+	if (lastPOS == TP_TOP) {			\
+	  yinnert = yt + lastTH + lastBW;		\
+	  yinnerb = yb - lastBW;			\
+	} else {					\
+	  yinnert = yt + lastBW;			\
+	  yinnerb = yb - lastTH - lastBW;		\
+	}						\
+      } else {						\
+	yinnert = yt + lastBW;				\
 	yinnerb = yb - lastBW;				\
+	if (lastPOS == TP_LEFT) {			\
+	  xinnerl = xl + lastTH + lastBW;		\
+	  xinnerr = xr - lastBW;			\
+	} else {					\
+	  xinnerl = xl + lastBW;			\
+	  xinnerr = xr - lastTH - lastBW;		\
+	}						\
+      }							\
 	xthird = (xinnerr - xinnerl) / 3;		\
 	ythird = (yinnerb - yinnert) / 3;		\
 							\
@@ -172,10 +191,31 @@ void MoveOutline(Window root, int x, int y, int width, int height, int bw, int t
 	r++;						\
 							\
 	if (lastTH != 0) {				\
+	 if (lastPOS == TP_TOP || lastPOS == TP_BOTTOM) {	\
+	  if (lastPOS == TP_TOP) {			\
 	    r->x1 = xl;					\
 	    r->y1 = yt + lastTH;			\
 	    r->x2 = xr;					\
 	    r->y2 = r->y1;				\
+	  } else {					\
+	    r->x1 = xl;					\
+	    r->y1 = yb - lastTH;			\
+	    r->x2 = xr;					\
+	    r->y2 = r->y1;				\
+	  }						\
+	 } else {					\
+	  if (lastPOS == TP_LEFT) {			\
+	    r->x1 = xl + lastTH;			\
+	    r->y1 = yt;					\
+	    r->x2 = r->x1;				\
+	    r->y2 = yb;					\
+	  } else {					\
+	    r->x1 = xr - lastTH;			\
+	    r->y1 = yt;					\
+	    r->x2 = r->x1;				\
+	    r->y2 = yb;					\
+	  }						\
+	 }						\
 	    r++;					\
 	}						\
     }
@@ -189,6 +229,7 @@ void MoveOutline(Window root, int x, int y, int width, int height, int bw, int t
     lastHeight = height;
     lastBW = bw;
     lastTH = th;
+    lastPOS = pos;
 
     /* draw the new one, if any */
     DRAWIT ();
@@ -678,6 +719,82 @@ MyFont_DrawString(Display *dpy, Drawable d, MyFont *font, GC gc,
 	return;
     }
     XDrawString (dpy, d, gc, x, y, string, len);
+}
+
+void
+MyFont_DrawString_Rotated(Display *dpy, Drawable d, MyFont *font, GC gc,
+			  int x, int y, const char *string, int len,
+			  Pixmap *pixp)
+{
+    int h, w;
+
+    if (len <= 0) return;
+
+    /* h = Scr->EntryHeight; */
+    h = font->height;
+    w = MyFont_TextWidth(font, string, len);
+
+    if (*pixp == None) {
+	XImage *title_h, *title_v;
+	Pixmap title_pix;
+	GC MonoGC;
+	int i, j;
+
+	/* draw a title horizontally to a monochrome pixmap */
+	title_pix = XCreatePixmap(dpy, Scr->Root, w, h, 1);
+	MonoGC = XCreateGC(dpy, title_pix, 0, NULL);
+	XSetForeground(dpy, MonoGC, WhitePixel(dpy, Scr->screen));
+	XSetBackground(dpy, MonoGC, WhitePixel(dpy, Scr->screen));
+	XFillRectangle(dpy, title_pix, MonoGC, 0, 0, w, h);
+	XSetFont(dpy, MonoGC, font->font->fid);
+	XSetForeground(dpy, MonoGC, BlackPixel(dpy, Scr->screen));
+
+	MyFont_DrawString (dpy, title_pix, font,
+			   MonoGC, 0, font->y,
+			   string, len);
+
+	title_h = XGetImage(dpy, title_pix, 0, 0, w, h, AllPlanes, XYPixmap);
+	XFreeGC(dpy, MonoGC);
+	XFreePixmap(dpy, title_pix);
+	if (title_h == NULL) {
+	    fprintf(stderr,
+		    "MyFont_DrawString_Rotated(): can't get title image\n");
+	    return;
+	}
+
+	/* allocate XImage for Rotated Title */
+	title_v = XCreateImage(dpy, 0, 1, XYBitmap, 0, NULL, h, w, 8, 0);
+	if (title_v == NULL) {
+	    fprintf(stderr, "MyFont_DrawString_Rotated(): can't alloc XImage\n");
+	    XDestroyImage(title_h);
+	    return;
+	}
+	title_v->data = (char *)calloc(1, title_v->bytes_per_line * w);
+	if (title_v->data == NULL) {
+	    fprintf(stderr,
+		    "MyFont_DrawString_Rotated(): can't alloc XImage data\n");
+	    XDestroyImage(title_h);
+	    XDestroyImage(title_v);
+	    return;
+	}
+	/* rotate CW */
+	for (i = 0; i < h; i++)
+	    for (j = 0; j < w; j++)
+		XPutPixel(title_v, i, j,
+			  XGetPixel(title_h, j, h-1-i)?0:1);
+	XDestroyImage(title_h);
+
+	/* put image to pixmap */
+	*pixp = XCreatePixmap(dpy, Scr->Root,
+			      h, w, Scr->d_depth);
+	/* XSetForeground(dpy, gc, Gcv.background); */
+	XFillRectangle(dpy, *pixp, gc, 0, 0, h, w);
+	/* XSetForeground(dpy, gc, Gcv.foreground); */
+	XPutImage(dpy, *pixp, gc, title_v,
+		  0, 0, 0, 0, h, w);
+	XDestroyImage(title_v);
+    }
+    XCopyArea(dpy, *pixp, d, gc, 0, 0, h, w, y, x);
 }
 
 void
