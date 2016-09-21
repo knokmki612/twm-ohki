@@ -746,7 +746,8 @@ MyFont_DrawString_Rotated(Display *dpy, Drawable d, MyFont *font, GC gc,
 	XSetForeground(dpy, MonoGC, WhitePixel(dpy, Scr->screen));
 	XSetBackground(dpy, MonoGC, WhitePixel(dpy, Scr->screen));
 	XFillRectangle(dpy, title_pix, MonoGC, 0, 0, w, h);
-	XSetFont(dpy, MonoGC, font->font->fid);
+	if (!use_fontset)
+	    XSetFont(dpy, MonoGC, font->font->fid);
 	XSetForeground(dpy, MonoGC, BlackPixel(dpy, Scr->screen));
 
 	MyFont_DrawString (dpy, title_pix, font,
