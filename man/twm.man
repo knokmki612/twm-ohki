@@ -565,9 +565,6 @@ inside of a
 .IP "\fBMenuBorderWidth\fP \fIpixels\fP" 8
 This variable specifies the width in pixels of the border surrounding
 menu windows.  The default is 2.
-.IP "\fBMenuBottomUp\fP" 8
-equivalent to set variables both \fBMenuAtLeft\fP and \fBMenuUpward\fP.
-(OBSOLETE!)
 .IP "\fBMenuFont\fP \fIstring\fP" 8
 This variable specifies the font to use when displaying menus.  The default
 is "variable".
@@ -595,11 +592,6 @@ This variable specifies the foreground color for \fBf.title\fP entries in
 menus and
 can only be specified inside of a
 \fBColor\fP or \fBMonochrome\fP list.  The default is "black".
-.IP "\fBMenuUpward\fP" 8
-When this variable is set,
-pull-down menus including cascated ones will be extended upward and
-menu items appear in reverse order.
-(OBSOLETE!)
 .IP "\fBMonochrome\fP { \fIcolors\fP }" 8
 This variable specifies a list of color assignments that should be made if
 the screen has a depth of 1.  See the description of \fBColors\fP.
