@@ -846,27 +846,7 @@ AddToMenu(MenuRoot *menu, const char *item, const char *action,
 	menu->pull = TRUE;
     }
     tmp->item_num = menu->items++;
-    /* move last entry (i.e. tmp) to head */
-    if ((Scr->MenuRuns == MenuRuns_B2T || Scr->MenuRuns == MenuRuns_R2L)
-	&& menu->first != menu->last) {
-	int i;
-	MenuItem *mi;
 
-	/* remove last entry (i.e. tmp) */
-	menu->last = tmp->prev;
-	menu->last->next = NULL;
-	/* put tmp at head */
-	menu->first->prev = tmp;
-	tmp->next = menu->first;
-	tmp->prev = NULL;
-	menu->first = tmp;
-	tmp->prev = NULL;
-	/* set sequence number */
-	for (i = 0, mi = menu->first; mi; mi = mi->next)
-	    mi->item_num = i++;
-	if (i != menu->items)
-	   fprintf(stderr, "AddToMenu(): items count mismatch!\n");
-    }
     return (tmp);
 }
 
@@ -979,6 +959,30 @@ MakeMenu(MenuRoot *mr)
 	XSaveContext(dpy, mr->w, ScreenContext, (caddr_t)Scr);
 
 	mr->mapped = UNMAPPED;
+    }
+
+    /* move first entry to last */
+    if ((Scr->MenuRuns == MenuRuns_B2T || Scr->MenuRuns == MenuRuns_R2L)
+	&& mr->first != mr->last) {
+	int i;
+
+	/* remove first entry */
+	start = mr->first->next;
+	end = mr->first;
+	start->prev = NULL;
+	mr->first = start;
+
+	/* add first entry at last */
+	mr->last->next = end;
+	end->prev = mr->last;
+	end->next = NULL;
+	mr->last = end;
+
+	/* set sequence number */
+	for (i = 0, cur = mr->first; cur; cur = cur->next)
+	    cur->item_num = i++;
+	if (i != mr->items)
+	   fprintf(stderr, "MakeMenu(): items count mismatch!\n");
     }
 
     /* get the default colors into the menus */
