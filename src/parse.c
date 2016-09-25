@@ -334,9 +334,7 @@ typedef struct _TwmKeyword {
 #define kw0_NoCaseSensitive		23
 #define kw0_NoRaiseOnWarp		24
 #define kw0_WarpUnmapped		25
-#define kw0_MenuBottomUp		26
-#define kw0_MenuAtLeft			27
-#define kw0_MenuUpward			28
+#define kw0_MenuAtLeft			26
 
 #define kws_UsePPosition		1
 #define kws_IconFont			2
@@ -523,14 +521,12 @@ static TwmKeyword keytable[] = {
     { "menubackground",		CKEYWORD, kwc_MenuBackground },
     { "menubordercolor",	CKEYWORD, kwc_MenuBorderColor },
     { "menuborderwidth",	NKEYWORD, kwn_MenuBorderWidth },
-    { "menubottomup",		KEYWORD, kw0_MenuBottomUp },
     { "menufont",		SKEYWORD, kws_MenuFont },
     { "menuforeground",		CKEYWORD, kwc_MenuForeground },
     { "menuruns",		MENU_RUNS, 0},
     { "menushadowcolor",	CKEYWORD, kwc_MenuShadowColor },
     { "menutitlebackground",	CKEYWORD, kwc_MenuTitleBackground },
     { "menutitleforeground",	CKEYWORD, kwc_MenuTitleForeground },
-    { "menuupward",		KEYWORD, kw0_MenuUpward },
     { "meta",			META, 0 },
     { "mod",			META, 0 },  /* fake it */
     { "monochrome",		MONOCHROME, 0 },
@@ -736,17 +732,8 @@ int do_single_keyword (int keyword)
 	Scr->WarpUnmapped = TRUE;
 	return 1;
 
-      case kw0_MenuBottomUp:
-	Scr->MenuAtLeft = TRUE;
-	Scr->MenuRuns = MenuRuns_B2T;
-	return 1;
-
       case kw0_MenuAtLeft:
 	Scr->MenuAtLeft = TRUE;
-	return 1;
-
-      case kw0_MenuUpward:
-	Scr->MenuRuns = MenuRuns_B2T;
 	return 1;
     }
 
